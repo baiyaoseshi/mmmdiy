@@ -1,0 +1,10 @@
+<Application x:Class="淼喵妙用户界面.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:淼喵妙用户界面"
+             xmlns:converters="clr-namespace:淼喵妙用户界面.Converters"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+    </Application.Resources>
+</Application>

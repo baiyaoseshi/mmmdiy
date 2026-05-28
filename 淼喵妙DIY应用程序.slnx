@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="淼喵妙用户界面/淼喵妙用户界面.csproj" />
+  <Project Path="淼喵妙神奇工具库/淼喵妙神奇工具库.csproj" />
+  <Project Path="../淼喵妙测试项目/淼喵妙测试项目.csproj" />
+</Solution>

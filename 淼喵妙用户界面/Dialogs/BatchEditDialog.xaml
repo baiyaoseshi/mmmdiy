@@ -1,0 +1,57 @@
+<Window x:Class="淼喵妙用户界面.Dialogs.BatchEditDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="批量编辑节点" Height="350" Width="400"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" x:Name="InfoText" Margin="0,0,0,10" FontWeight="Bold"/>
+
+        <GroupBox Grid.Row="1" Header="成功后等待 (ms)" Margin="0,0,0,10">
+            <Grid Margin="5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox Grid.Column="0" x:Name="修改成功后等待Check" Content="修改成功后等待" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <TextBox Grid.Column="1" x:Name="成功后等待TextBox" Width="100" HorizontalAlignment="Left"/>
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Grid.Row="2" Header="失败后等待 (ms)" Margin="0,0,0,10">
+            <Grid Margin="5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox Grid.Column="0" x:Name="修改失败后等待Check" Content="修改失败后等待" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <TextBox Grid.Column="1" x:Name="失败后等待TextBox" Width="100" HorizontalAlignment="Left"/>
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Grid.Row="3" Header="节点备注">
+            <Grid Margin="5">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <CheckBox Grid.Row="0" x:Name="修改节点备注Check" Content="修改节点备注" Margin="0,0,0,5"/>
+                <TextBox Grid.Row="1" x:Name="节点备注TextBox" Height="60" TextWrapping="Wrap" AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto"/>
+            </Grid>
+        </GroupBox>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="确定" Click="确定按钮_Click" Width="75" Margin="0,0,10,0" Padding="5"/>
+            <Button Content="取消" Click="取消按钮_Click" Width="75" Padding="5"/>
+        </StackPanel>
+    </Grid>
+</Window>

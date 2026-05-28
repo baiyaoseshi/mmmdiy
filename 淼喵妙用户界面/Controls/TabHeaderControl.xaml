@@ -1,0 +1,74 @@
+<UserControl x:Class="淼喵妙用户界面.Controls.TabHeaderControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:converters="clr-namespace:淼喵妙用户界面.Converters"
+             mc:Ignorable="d" 
+             d:DesignHeight="30" d:DesignWidth="200">
+    <UserControl.Resources>
+        <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+    </UserControl.Resources>
+    
+    <Grid Height="30" Margin="1" MouseLeftButtonUp="Grid_MouseLeftButtonUp" Cursor="Hand">
+        <Grid.Style>
+            <Style TargetType="Grid">
+                <Setter Property="Background" Value="#FFE0E0E0"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
+                        <Setter Property="Background" Value="#FFB0D0FF"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Grid.Style>
+        <Grid.ContextMenu>
+            <ContextMenu>
+                <MenuItem Header="保存" Name="SaveMenuItem"
+                          Click="SaveMenuItem_Click"
+                          IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}}"/>
+                <MenuItem Header="改名" Name="RenameMenuItem"
+                          Click="RenameMenuItem_Click"
+                          IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}}"/>
+                <MenuItem Header="修改备注" Name="EditRemarkMenuItem"
+                          Click="EditRemarkMenuItem_Click"
+                          IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}}"/>
+                <MenuItem Header="清空绑定窗口" Name="ClearBindingMenuItem"
+                          Click="ClearBindingMenuItem_Click"
+                          IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}}"/>
+                <MenuItem Header="一键停止" Name="StopAllMenuItem"
+                          Click="StopAllMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="关闭" Name="CloseMenuItem"
+                          Click="CloseMenuItem_Click"
+                          IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}}"/>
+            </ContextMenu>
+        </Grid.ContextMenu>
+        
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        
+        <TextBlock Grid.Column="0" Text="{Binding ScriptName}" 
+                   VerticalAlignment="Center" HorizontalAlignment="Center"
+                   Margin="10,0" Foreground="Black" FontSize="12"/>
+        
+        <Button Grid.Column="1" Content="▶" Width="25" Height="20" Margin="0,5,5,5"
+                Click="RunButton_Click"
+                Foreground="Black" BorderBrush="LightGray"
+                ToolTip="运行脚本" Padding="0">
+            <Button.Style>
+                <Style TargetType="Button">
+                    <Setter Property="Background" Value="#FFC0C0C0"/>
+                    <Setter Property="IsEnabled" Value="True"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                            <Setter Property="Background" Value="#FF4CAF50"/>
+                            <Setter Property="IsEnabled" Value="False"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Button.Style>
+        </Button>
+    </Grid>
+</UserControl>
