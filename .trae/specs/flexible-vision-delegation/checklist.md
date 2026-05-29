@@ -1,0 +1,21 @@
+# Checklist
+
+- [x] `ask_vision_ai` 工具定义出现在 `获取通用工具列表()` 返回值中
+- [x] `analyze_screen` 和 `locate_on_screen` 已从 `获取通用工具列表()` 和 `内置工具ID列表` 中移除
+- [x] `执行内置工具("ask_vision_ai", ...)` 能正确截图并调用视觉AI
+- [x] 视觉AI未配置时 `ask_vision_ai` 返回友好提示
+- [x] 视觉AI调用异常时 `ask_vision_ai` 返回错误信息
+- [x] 旧方法 `分析屏幕截图()` 和 `定位屏幕元素()` 已删除
+- [x] `构建消息列表()` 的远程API系统Prompt中不再包含 `analyze_screen` 和 `locate_on_screen`
+- [x] `构建消息列表()` 的远程API系统Prompt中包含 `ask_vision_ai` 的准确描述
+- [x] `构建消息列表()` 的远程API系统Prompt中脚本编辑工作流不再推荐 `web_search`
+- [x] `构建提示词()` 的Ollama系统Prompt中不再包含 `analyze_screen` 和 `locate_on_screen`
+- [x] `构建提示词()` 的Ollama系统Prompt中包含 `ask_vision_ai` 的准确描述
+- [x] `构建提示词()` 的Ollama系统Prompt中脚本编辑工作流不再推荐 `web_search`
+- [x] 输入 `/` 时弹出菜单中包含 `/web` 和 `/screen` 内置指令
+- [x] 选中 `/web` 后输入框填入 `/web ` 前缀
+- [x] 选中 `/screen` 后输入框填入 `/screen ` 前缀
+- [x] 发送 `/web 查询内容` 后，AI的系统消息中包含「先搜索再回答」指令
+- [x] 发送 `/screen 问题` 后，AI的系统消息中包含「先看屏幕再回答」指令
+- [x] `web_search` 工具功能本身未被删除（仅从Prompt推荐中移除）
+- [x] 两个项目均编译通过无错误

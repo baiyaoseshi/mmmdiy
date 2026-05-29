@@ -1,0 +1,22 @@
+# Checklist
+
+- [x] `AINamedConfig` 类在 `AI配置模型.cs` 中定义，包含 `Id`、`名称`、`AIConfigData 配置` 三个字段
+- [x] `AIConversation` 包含 `文本AI配置Id`、`多模态AI配置Id` 字符串字段
+- [x] `AIPersistenceData` 包含 `AI配置列表`（`List<AINamedConfig>`）、`上次文本配置Id`、`上次多模态配置Id`、`视觉AI配置Id`、`评审AI配置Id`
+- [x] 旧 `全局AI配置` 字段保留在 `AIPersistenceData` 中以支持向后兼容迁移
+- [x] `AI配置管理器.加载数据()` 包含数据迁移逻辑：旧 `全局AI配置`（有值）+ `AI配置列表`（空）→ 自动迁移
+- [x] `AI配置管理器` 提供 `获取配置列表()`、`添加配置()`、`删除配置()`、`更新配置()`、`根据Id获取配置()` 方法
+- [x] `AI配置管理器.获取全局配置()` 返回列表第一个配置，保持向后兼容
+- [x] `AI配置管理器.获取视觉AI配置()` / `获取评审AI配置()` 通过 ID 引用从列表查找
+- [x] 删除被引用的配置时，相关对话的配置 ID 回退到列表第一个
+- [x] `GlobalAISettings` 提供配置列表的增/删/编辑功能
+- [x] `GlobalAISettings` 编辑单个配置时可修改：名称、提供者类型、Ollama 地址/模型、远程 API 地址/密钥/模型、Google 密钥、最大 Token、温度
+- [x] `GlobalAISettings` 视觉 AI / 评审 AI 改为从配置列表中选择
+- [x] `AIConversationSettings` 包含"文本模型"下拉框，选项来自全局配置列表
+- [x] `AIConversationSettings` 包含"多模态模型"下拉框，选项来自全局配置列表 + "使用文本模型"
+- [x] `AIConversationSettings` 包含"本地可调参模型"下拉框，选项来自全局配置列表 + "使用文本模型"
+- [x] 新建对话时，模型选择默认使用上次使用的配置 ID（`上次文本配置Id` / `上次多模态配置Id`）
+- [x] `AIChatPage.解析AI配置()` 根据对话选择的配置 ID 查找 `AIConfigData`
+- [x] `ask_vision_ai` 工具调用使用对话的多模态模型配置（未设置时回退到文本模型）
+- [x] 两个项目均编译通过无错误
+- [x] 代码遵循全中文命名约定，所有 `await` 使用 `.ConfigureAwait(false)`

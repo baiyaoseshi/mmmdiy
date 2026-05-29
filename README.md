@@ -1,121 +1,223 @@
-# 淼喵妙 — 手机端远程指令使用指南
+# 淼喵妙脚本DIY — 多模态 AI Agent 桌面工具
 
-## 1. 在 PC 端启用远程指令
+[![.NET Build and Test](https://github.com/baiyaoseshi/mmmdiy/actions/workflows/dotnet.yml/badge.svg)](https://github.com/baiyaoseshi/mmmdiy/actions/workflows/dotnet.yml)
 
-1. 打开淼喵妙主界面，展开底部的 **远程指令设置** 折叠面板
-2. 勾选 **启用**
-3. 确认端口号（默认 `18888`）
-4. 如需安全验证，填入 **令牌**（一个自定义字符串，留空则跳过验证）
-5. 点击 **应用设置**，状态显示 `运行中 (端口:18888)` 即成功
+> 🚀 将本地 LLM + 视觉 AI + RPA 自动化融为一体的 Windows 桌面工具。AI 可直接调用 23 个内置工具和 40+ 种流程节点，实现从对话到脚本构建到自动执行的完整闭环。
 
-> 令牌为空时任何人都能发指令；填入令牌后需要附带 Authorization 头。
+**Technologies**: C# · WPF · .NET 10 · MVVM · Ollama / OpenAI API · MCP Protocol · ONNX Runtime (YOLO) · OpenCV · PaddleOCR · xUnit
 
-## 2. 获取 PC 的 IP 地址
+---
 
-手机和 PC 须在同一局域网内。
+## ✨ 核心能力
 
-- **局域网 IP**：打开 cmd 执行 `ipconfig`，找到 `IPv4 地址`，如 `192.168.1.100`
-- **Tailscale IP**：如果已安装 Tailscale，可在系统托盘 Tailscale 图标中查看，适用于远程/外网场景
+| 模块 | 说明 |
+|------|------|
+| **🤖 AI Agent 引擎** | 支持 Ollama 本地模型 + OpenAI 兼容 API，流式对话、工具调用、思考内容分离、计划评审、经验自学习 |
+| **🔧 MCP 工具协议** | 自研 23 个内置工具（视觉分析、网页搜索、脚本构建链、系统控制），AI 自动选择合适的工具完成复杂任务 |
+| **👁️ 计算机视觉** | YOLO 目标检测、PaddleOCR 文字识别、OpenCV 图像处理、自定义鲁棒模板匹配算法 |
+| **⚡ RPA 自动化** | 40+ 种流程节点，支持键盘鼠标模拟、窗口控制、条件判断、定时/触发任务、远程 HTTP 指令 |
+| **📡 远程控制** | 内置 HTTP 服务器，支持 `/2AI` 对话、`/task` 任务触发、`/plan` 指令注入 |
 
-## 3. 三种指令类型
+## 🏗️ 架构
 
-| 指令格式 | 用途 | 说明 |
-|----------|------|------|
-| `/task 任务名` | 触发一个已配置的指令触发任务 | 任务需要在「触发任务」页签中提前设置，触发类型选「指令」 |
-| `/plan 内容` | 向正在运行的脚本注入数据 | 脚本中须包含「远程指令」节点，该节点会阻塞等待并接收数据 |
-| `/2AI 对话标签 内容` | 发送给 AI 对话 | 需启用 AI 对话功能 |
+```mermaid
+graph TD
+    subgraph UI["WPF 用户界面"]
+        MVVM["MVVM ViewModel 调度中心"]
+        AIChat["AI 对话页"]
+        ScriptEditor["脚本编辑器"]
+        TaskQueue["任务队列管理"]
+    end
 
-> 不带前缀的纯文本默认当作 `/plan` 处理。
+    subgraph AI["AI 引擎"]
+        LLM["AI配置管理器<br/>Ollama / OpenAI API"]
+        MCP["MCP工具管理器<br/>23内置工具 + 脚本工具"]
+        Experience["AI使用经验管理器<br/>计划评审 + 自学习"]
+    end
 
-## 4. 手机端发送方式
+    subgraph Tools["工具协议层"]
+        BuiltIn["内置工具<br/>视觉/搜索/脚本构建/系统"]
+        ScriptTools["脚本工具<br/>40+ 流程节点"]
+    end
 
-### 方式一：浏览器直接访问（推荐，最简单）
+    subgraph OS["操作系统层"]
+        Input["键盘鼠标模拟<br/>H.InputSimulator"]
+        CV["计算机视觉<br/>ONNX / OpenCV / PaddleOCR"]
+        HTTP["远程指令<br/>HttpListener"]
+    end
 
-在手机浏览器地址栏输入：
+    UI --> AI
+    AI --> Tools
+    Tools --> OS
 
+    style UI fill:#e1f5fe
+    style AI fill:#fff3e0
+    style Tools fill:#e8f5e9
+    style OS fill:#f3e5f5
 ```
-http://192.168.1.100:18888/cmd?msg=/task 我的任务名
-```
 
-- `192.168.1.100` 替换为你的 PC 局域网 IP
-- 端口号替换为你设置的值
-- `/task 我的任务名` 替换为实际指令
+## 🚀 本地运行
 
-**状态检查**：访问 `http://192.168.1.100:18888/` 可查看服务器是否在线。
+### 前置条件
 
-### 方式二：快捷指令 / Shortcuts（iOS）
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- Windows 10/11 x64
+- （可选）[Ollama](https://ollama.com/) + 已拉取的模型（如 `qwen3:latest`），用于本地 LLM
+- （可选）OpenAI 兼容 API Key，用于远程 LLM
 
-1. 打开「快捷指令」App
-2. 新建快捷指令 → 添加动作 → 搜索「获取 URL 内容」
-3. URL 填入：`http://你的IP:18888/cmd?msg=/task 任务名`
-4. 方法选择 `GET`
-5. 保存后即可一键触发
-
-### 方式三：HTTP 快捷方式 App（Android / iOS）
-
-安装任意 HTTP 请求工具（如 HTTP Shortcuts、Reqable），配置一个 GET 请求指向 `http://你的IP:18888/cmd?msg=/task 任务名`，保存后一键发送。
-
-### 方式四：curl / wget（Termux 等终端）
+### 编译运行
 
 ```bash
-curl "http://192.168.1.100:18888/cmd?msg=/task 任务名"
+git clone https://github.com/baiyaoseshi/mmmdiy.git
+cd mmmdiy
+dotnet restore "淼喵妙DIY应用程序\淼喵妙DIY应用程序.slnx"
+dotnet build "淼喵妙DIY应用程序\淼喵妙DIY应用程序.slnx" --configuration Release
+
+# 运行
+dotnet run --project "淼喵妙DIY应用程序\淼喵妙用户界面\淼喵妙用户界面.csproj"
 ```
 
-### POST 方式（JSON Body）
-
-```
-POST http://192.168.1.100:18888/cmd
-Content-Type: application/json
-
-{"msg": "/task 任务名"}
-```
-
-## 5. 带令牌验证的请求
-
-如果设置了令牌，所有 `/cmd` 请求须附带 Authorization 头：
-
-```
-Authorization: Bearer 你的令牌
-```
-
-浏览器 GET 无法方便地加 Header，建议使用快捷指令 App 或 curl：
+### 运行测试
 
 ```bash
-curl -H "Authorization: Bearer 你的令牌" "http://192.168.1.100:18888/cmd?msg=/task 任务名"
+dotnet test "淼喵妙DIY应用程序\淼喵妙DIY应用程序.slnx"
 ```
 
-## 6. 完整使用流程示例
+## 📂 项目结构
 
-### 场景 A：手机一键启动 PC 上的脚本
+```
+├── 淼喵妙DIY应用程序/
+│   ├── 淼喵妙用户界面/        # WPF UI 层 (MVVM, 8 ViewModels, 16 XAML)
+│   │   ├── ViewModels/        # MainWindowViewModel (调度中心)
+│   │   ├── Controls/          # AIChatPage, AIChatControl, ScriptEditor
+│   │   └── Dialogs/           # 节点编辑/选择对话框
+│   └── 淼喵妙神奇工具库/      # 核心引擎 (76 files, ~14k lines)
+│       ├── AI配置管理器.cs     # LLM 调用核心中枢
+│       ├── AI使用经验管理器.cs  # 经验学习 + 计划评审
+│       ├── MCP工具管理器.cs    # 工具注册与分派
+│       ├── 通用MCP工具.cs      # 23 个内置工具实现
+│       ├── 感知库/             # CV: 图像识别、OCR、串联
+│       ├── 键鼠库/动作/        # RPA 引擎 + 40+ 流程节点
+│       └── 输出库/             # 通知 + 图像工具
+└── 淼喵妙测试项目/             # xUnit 单元测试
+    └── CoreTests.cs
+```
 
-1. PC 端：在「触发任务」页签新建任务 → 触发类型选「指令」→ 输入任务名（如 `打开浏览器`）→ 选择脚本文件 → 保存
-2. PC 端：启用远程指令服务器
-3. 手机端浏览器访问：
-   ```
-   http://192.168.1.100:18888/cmd?msg=/task 打开浏览器
-   ```
-4. 脚本立即在 PC 上执行（延迟秒数可在触发任务中配置）
+## 📸 截图
 
-### 场景 B：运行中的脚本接收手机发来的数据
+> 将截图放入 `docs/screenshots/` 目录，然后替换下方占位链接。
 
-1. 在脚本中拖入「远程指令」节点，设置变量名（如 `手机输入`）和超时秒数
-2. PC 端运行该脚本，执行到「远程指令」节点时会阻塞等待
-3. 手机发送：
-   ```
-   http://192.168.1.100:18888/cmd?msg=/plan 这是手机发来的文本
-   ```
-4. 脚本中 `手机输入` 变量接收到 `这是手机发来的文本`，继续执行
+![AI对话](docs/screenshots/ai-chat.png)
+![脚本编辑](docs/screenshots/script-editor.png)
 
-## 7. 外网访问（Tailscale）
+---
 
-如果不在同一局域网，推荐使用 Tailscale：
+# MiaoMiaoMiao Script DIY — Multimodal AI Agent Desktop Tool
 
-1. PC 和手机均安装 Tailscale 并登录同一账号
-2. 在 PC 的 Tailscale 图标中查看分配的 IP（如 `100.x.x.x`）
-3. 手机端用 Tailscale IP 替代局域网 IP 发送指令即可
+[![.NET Build and Test](https://github.com/baiyaoseshi/mmmdiy/actions/workflows/dotnet.yml/badge.svg)](https://github.com/baiyaoseshi/mmmdiy/actions/workflows/dotnet.yml)
 
-## 8. 注意事项
+> A Windows desktop tool that integrates local LLMs, vision AI, and RPA automation into a unified experience. The AI agent can directly invoke 23 built-in tools and 40+ workflow nodes, enabling a complete loop from conversation to script creation to automated execution.
 
-- 远程指令任务触发后**自动禁用**（单次触发），如需再次触发请重新启用
-- Windows 防火墙可能拦截端口，首次使用若不通请检查防火墙设置
-- 建议局域网场景下使用 HTTP，若需公网暴露请务必设置令牌
+**Technologies**: C# · WPF · .NET 10 · MVVM · Ollama / OpenAI API · MCP Protocol · ONNX Runtime (YOLO) · OpenCV · PaddleOCR · xUnit
+
+## ✨ Core Capabilities
+
+| Module | Description |
+|--------|-------------|
+| **🤖 AI Agent Engine** | Supports Ollama local models + OpenAI-compatible API with streaming chat, tool calling, thinking/reasoning separation, plan review, and experience self-learning |
+| **🔧 MCP Tool Protocol** | Custom implementation of 23 built-in tools (vision analysis, web search, script building pipeline, system control). AI autonomously selects appropriate tools for complex tasks |
+| **👁️ Computer Vision** | YOLO object detection (ONNX), PaddleOCR text recognition, OpenCV image processing, custom robust template matching algorithm |
+| **⚡ RPA Automation** | 40+ workflow node types supporting keyboard/mouse simulation, window control, conditional branching, scheduled/triggered tasks, remote HTTP commands |
+| **📡 Remote Control** | Built-in HTTP server supporting `/2AI` chat commands, `/task` trigger events, and `/plan` injection |
+
+## 🏗️ Architecture
+
+```mermaid
+graph TD
+    subgraph UI["WPF UI Layer"]
+        MVVM["MVVM ViewModel Scheduler"]
+        AIChat["AI Chat Page"]
+        ScriptEditor["Script Editor"]
+        TaskQueue["Task Queue Manager"]
+    end
+
+    subgraph AI["AI Engine"]
+        LLM["AI Config Manager<br/>Ollama / OpenAI API"]
+        MCP["MCP Tool Manager<br/>23 Built-in + Script Tools"]
+        Experience["Experience Manager<br/>Plan Review + Self-Learning"]
+    end
+
+    subgraph Tools["Tool Protocol Layer"]
+        BuiltIn["Built-in Tools<br/>Vision/Search/Script/System"]
+        ScriptTools["Script Tools<br/>40+ Workflow Nodes"]
+    end
+
+    subgraph OS["OS Layer"]
+        Input["Input Simulation<br/>H.InputSimulator"]
+        CV["Computer Vision<br/>ONNX / OpenCV / PaddleOCR"]
+        HTTP["Remote Commands<br/>HttpListener"]
+    end
+
+    UI --> AI
+    AI --> Tools
+    Tools --> OS
+
+    style UI fill:#e1f5fe
+    style AI fill:#fff3e0
+    style Tools fill:#e8f5e9
+    style OS fill:#f3e5f5
+```
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- Windows 10/11 x64
+- (Optional) [Ollama](https://ollama.com/) with a pulled model (e.g., `qwen3:latest`) for local LLM
+- (Optional) OpenAI-compatible API Key for remote LLM
+
+### Build & Run
+
+```bash
+git clone https://github.com/baiyaoseshi/mmmdiy.git
+cd mmmdiy
+dotnet restore "淼喵妙DIY应用程序\淼喵妙DIY应用程序.slnx"
+dotnet build "淼喵妙DIY应用程序\淼喵妙DIY应用程序.slnx" --configuration Release
+
+# Run
+dotnet run --project "淼喵妙DIY应用程序\淼喵妙用户界面\淼喵妙用户界面.csproj"
+```
+
+### Run Tests
+
+```bash
+dotnet test "淼喵妙DIY应用程序\淼喵妙DIY应用程序.slnx"
+```
+
+## 📂 Project Structure
+
+```
+├── 淼喵妙DIY应用程序/
+│   ├── 淼喵妙用户界面/        # WPF UI Layer (MVVM, 8 ViewModels, 16 XAML)
+│   │   ├── ViewModels/        # MainWindowViewModel (scheduler hub)
+│   │   ├── Controls/          # AIChatPage, AIChatControl, ScriptEditor
+│   │   └── Dialogs/           # Node editing/selection dialogs
+│   └── 淼喵妙神奇工具库/      # Core Engine (76 files, ~14k lines)
+│       ├── AI配置管理器.cs     # LLM invocation hub
+│       ├── AI使用经验管理器.cs  # Experience learning + plan review
+│       ├── MCP工具管理器.cs    # Tool registration & dispatch
+│       ├── 通用MCP工具.cs      # 23 built-in tool implementations
+│       ├── 感知库/             # CV: image recognition, OCR, pipelines
+│       ├── 键鼠库/动作/        # RPA engine + 40+ workflow nodes
+│       └── 输出库/             # Notifications + image utilities
+└── 淼喵妙测试项目/             # xUnit unit tests
+    └── CoreTests.cs
+```
+
+## 📸 Screenshots
+
+> Place screenshots in `docs/screenshots/` and update the placeholder links below.
+
+![AI Chat](docs/screenshots/ai-chat.png)
+![Script Editor](docs/screenshots/script-editor.png)

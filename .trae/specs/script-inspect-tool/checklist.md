@@ -1,0 +1,27 @@
+# Checklist
+
+- [x] `expand_script` 工具ID已注册到 `内置工具ID列表`
+- [x] `expand_script` 的 switch case 已添加到 `执行内置工具`
+- [x] `expand_script` 读取 `userdata.json` 遍历所有分类下的所有脚本（不限已加载工具范围）
+- [x] `expand_script` 支持通过脚本文件名（不含扩展名）精确匹配
+- [x] `expand_script` 支持通过完整文件路径精确匹配
+- [x] `expand_script` 支持模糊匹配（名称 Contains）
+- [x] `expand_script` 未找到时返回友好错误提示
+- [x] `expand_script` 返回格式包含结构化头部信息（脚本名、目标进程、窗口标题、备注）
+- [x] `expand_script` 返回格式包含每个节点的类型标签名和所有字段值
+- [x] `expand_script` 返回格式包含节点总数
+- [x] `expand_script` 图片字段（模板数据/模板图像等）自动替换为 `[图片数据已省略]`
+- [x] `expand_script` 疑似 base64 长字段自动替换为 `[数据过长已省略]`
+- [x] `search_scripts` 工具ID已注册到 `内置工具ID列表`
+- [x] `search_scripts` 的 switch case 已添加到 `执行内置工具`
+- [x] `search_scripts` 读取 `userdata.json` 遍历所有分类下的所有脚本（不限已加载工具范围）
+- [x] `search_scripts` "名称备注" 模式只匹配脚本文件名 + 备注
+- [x] `search_scripts` "完整内容" 模式额外读取 `.script` 文件全文匹配
+- [x] `search_scripts` 限制最大返回数量（默认5）
+- [x] `search_scripts` 超出最大结果数时标注剩余条数
+- [x] `search_scripts` 无匹配时返回友好提示
+- [x] `构建提示词()` (Ollama) 中已注册两个新工具的使用指南
+- [x] `构建消息列表()` (OpenAI) 中已注册两个新工具的使用指南
+- [x] 提示词中说明了推荐工作流（搜索→展开→模仿创建）
+- [x] 工具库项目编译通过
+- [x] 用户界面项目编译通过
