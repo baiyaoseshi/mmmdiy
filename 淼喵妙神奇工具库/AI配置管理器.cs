@@ -9,7 +9,6 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using OllamaSharp;
@@ -25,6 +24,7 @@ namespace 淼喵妙神奇工具库
         private static string _当前对话Id;
         public static AsyncLocal<string> 当前对话Id上下文 = new AsyncLocal<string>();
         public static string 默认用户名 = "默认用户";
+        public static volatile bool 是否训练中 = false;
 
         private static string 数据目录 => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "淼喵妙脚本DIY");
         private static string 数据文件路径 => Path.Combine(数据目录, "ai_config.json");
@@ -226,6 +226,24 @@ namespace 淼喵妙神奇工具库
             保存数据();
         }
 
+        public static AIConfigData 获取经验AI配置()
+        {
+            var cfg = 根据Id获取配置(_数据.经验AI配置Id);
+            if (cfg == null) return null;
+            var result = new AIConfigData
+            {
+                Ollama地址 = cfg.Ollama地址,
+                Ollama模型 = cfg.Ollama模型
+            };
+            if (string.IsNullOrEmpty(result.Ollama模型)) return null;
+            return result;
+        }
+
+        public static void 更新经验AI配置(string 配置Id)
+        {
+            _数据.经验AI配置Id = 配置Id;
+        }
+
         public static bool 获取启用增量记录()
         {
             return _数据.启用增量记录;
@@ -367,11 +385,24 @@ namespace 淼喵妙神奇工具库
             }
         }
 
+        private static string 解析提供者(AIConfigData config)
+        {
+            if (string.IsNullOrEmpty(config.提供者类型))
+            {
+                if (!string.IsNullOrEmpty(config.Ollama模型))
+                    return "Ollama本地";
+                if (!string.IsNullOrEmpty(config.远程API地址) && !string.IsNullOrEmpty(解密密钥(config.加密API密钥)))
+                    return "OpenAI 兼容 API";
+                return "";
+            }
+            return config.提供者类型;
+        }
+
         public static async Task<string> 调用AI(AIConfigData config, List<AIChatMessage> 消息历史, string 自定义规则)
         {
             if (config == null) return null;
 
-            if (config.提供者类型 == "Ollama本地")
+            if (解析提供者(config) == "Ollama本地")
             {
                 return await 调用本地AI(config, 消息历史, 自定义规则);
             }
@@ -499,7 +530,7 @@ namespace 淼喵妙神奇工具库
         {
             if (config == null) return null;
 
-            if (config.提供者类型 == "Ollama本地")
+            if (解析提供者(config) == "Ollama本地")
                 return await 调用本地AI分析截图(config, base64Image, 提示词);
             else
                 return await 调用远程AI分析截图(config, base64Image, 提示词);
@@ -658,7 +689,13 @@ namespace 淼喵妙神奇工具库
         {
             if (config == null) return null;
 
-            if (config.提供者类型 == "Ollama本地")
+            if (是否训练中)
+            {
+                回调?.Invoke("模型训练中，请稍候再试");
+                return "模型训练中，请稍候再试";
+            }
+
+            if (解析提供者(config) == "Ollama本地")
             {
                 return await 调用本地AI流式带工具(config, 消息历史, 自定义规则, 工具列表, 回调, 工具回调, 思考回调, 进度回调, cancellationToken, 当前计划树);
             }
@@ -714,38 +751,11 @@ namespace 淼喵妙神奇工具库
                 if (提取计划 != null)
                     当前计划树 = 提取计划;
 
-                var 评审配置 = 获取评审AI配置();
-                if (当前计划树 != null && 评审配置 != null && !string.IsNullOrEmpty(评审配置.远程API地址))
-                {
-                    var 工具ID列表 = 工具列表?.Select(t => t.工具ID).ToList() ?? new List<string>();
-                    var (_, 建议) = await AI使用经验管理器.评审计划(当前计划树, 工具ID列表).ConfigureAwait(false);
-                    if (!string.IsNullOrEmpty(建议))
-                    {
-                        消息历史.Add(new AIChatMessage { 角色 = "系统", 内容 = $"[计划评审建议]\n{建议}\n\n请参考以上建议调整你的执行计划。" });
-                        var 评审重试历史 = new List<AIChatMessage>(消息历史);
-                        try
-                        {
-                            string 后续回复 = await 调用本地AI流式带工具(config, 评审重试历史, 自定义规则, 工具列表, 回调, 工具回调, 思考回调, 进度回调, cancellationToken, 当前计划树);
-                            if (!string.IsNullOrEmpty(后续回复))
-                                完整回复.Append("\n\n").Append(后续回复);
-                        }
-                        catch { }
-                        return 完整回复.Length > 0 ? 完整回复.ToString() : "计划已评审，请重新提交调整后的计划。";
-                    }
-                }
-
                 var 树修改列表 = new List<计划节点>();
                 var 对话Id上下文 = 当前对话Id上下文?.Value;
                 var 工具结果 = 工具列表 != null && 工具列表.Count > 0
                     ? MCP工具管理器.解析ToolCall响应(回复文本, 工具列表, async msg => { if (进度回调 != null) await 进度回调(msg); }, 对话Id上下文, 0, 当前计划树, 树修改列表)
                     : new List<string>();
-
-                if (工具列表 != null && 工具列表.Count > 0 && 工具结果.Count > 0 && 当前计划树 == null && AI配置管理器.获取启用增量记录())
-                {
-                    if (工具回调 != null)
-                        await 工具回调("⚠️ 未检测到计划。请使用 [计划]...[/计划] 格式提交执行计划后再开始工具调用。");
-                    return 完整回复.Length > 0 ? 完整回复.ToString() : "未检测到计划。请使用 [计划]...[/计划] 格式提交执行计划后再开始工具调用。";
-                }
 
                 if (当前计划树 != null && 树修改列表.Count > 0)
                 {
@@ -758,6 +768,37 @@ namespace 淼喵妙神奇工具库
 
                 foreach (var result in 工具结果)
                 {
+                    var 记录ForEval = new 工具调用记录
+                    {
+                        工具ID = "",
+                        调用时间 = DateTime.Now,
+                        输入参数 = new Dictionary<string, object>(),
+                        是否成功 = !result.Contains("执行失败"),
+                        输出摘要 = result,
+                        对话ID = 对话Id上下文 ?? "",
+                        对话轮次 = 0,
+                        调用时计划树 = 当前计划树
+                    };
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var 经验配置 = 获取经验AI配置();
+                            if (经验配置 != null)
+                            {
+                                var (quality, match, reason, tags) = await AI使用经验管理器.评估工具调用(经验配置, 记录ForEval).ConfigureAwait(false);
+                                AI使用经验管理器.更新印象(记录ForEval.工具ID, match, reason, 记录ForEval);
+                                if (quality == "high")
+                                {
+                                    var 印象 = AI使用经验管理器.获取工具印象(记录ForEval.工具ID);
+                                    int 印象版本 = 印象.修正历史.Count;
+                                    AI使用经验管理器.追加训练样本(记录ForEval, quality, match, 印象.当前印象, 印象版本);
+                                }
+                            }
+                        }
+                        catch { }
+                    });
+
                     string 工具消息 = $"🔧 {result}";
                     if (工具回调 != null)
                         await 工具回调(工具消息);
@@ -803,8 +844,7 @@ namespace 淼喵妙神奇工具库
             var 分类规则提示词 = 工具列表 != null ? 收集分类规则提示词(工具列表) : "";
             if (!string.IsNullOrEmpty(分类规则提示词))
             {
-                int 插入位置 = string.IsNullOrEmpty(自定义规则) ? 2 : 3;
-                messages.Insert(插入位置, new { role = "system", content = 分类规则提示词 });
+                messages.Insert(1, new { role = "system", content = 分类规则提示词 });
             }
             var apiKey = 解密密钥(config.加密API密钥);
             string model = string.IsNullOrEmpty(config.远程模型) ? "gpt-4o-mini" : config.远程模型;
@@ -928,25 +968,6 @@ namespace 淼喵妙神奇工具库
                     if (提取计划 != null)
                         当前计划树 = 提取计划;
 
-                    var 评审配置2 = 获取评审AI配置();
-                    if (当前计划树 != null && round == 1 && 评审配置2 != null && !string.IsNullOrEmpty(评审配置2.远程API地址))
-                    {
-                        var 工具ID列表 = 工具列表?.Select(t => t.工具ID).ToList() ?? new List<string>();
-                        var (_, 建议) = await AI使用经验管理器.评审计划(当前计划树, 工具ID列表).ConfigureAwait(false);
-                        if (!string.IsNullOrEmpty(建议))
-                        {
-                            messages.Add(new { role = "system", content = $"[计划评审建议]\n{建议}\n\n请参考以上建议调整你的执行计划。" });
-                            continue;
-                        }
-                    }
-
-                    if (当前计划树 == null && AI配置管理器.获取启用增量记录())
-                    {
-                        if (工具回调 != null)
-                            await 工具回调("⚠️ 未检测到计划。请使用 [计划]...[/计划] 格式提交执行计划后再开始工具调用。");
-                        return 累计回复.Length > 0 ? 累计回复.ToString() : "未检测到计划。请使用 [计划]...[/计划] 格式提交执行计划后再开始工具调用。";
-                    }
-
                     System.Diagnostics.Debug.WriteLine($"[MSG] finishReason={finishReason}, 执行{工具列表.Count}工具, 列表: {string.Join(",", 工具列表.Select(t => t.工具ID))}");
                     已执行工具 = true;
                     var tcMessages = new List<object>();
@@ -967,19 +988,6 @@ namespace 淼喵妙神奇工具库
                     foreach (var kv in toolCalls.OrderBy(k => k.Key))
                     {
                         var (tid, tname, args) = kv.Value;
-                        if (AI配置管理器.获取启用增量记录() && !工具在计划内(tname, 当前计划树))
-                        {
-                            string 错误信息 = $"工具 {tname} 不在当前执行计划中，请按计划顺序执行工具。";
-                            messages.Add(new Dictionary<string, object>
-                            {
-                                ["role"] = "tool",
-                                ["tool_call_id"] = tid,
-                                ["content"] = 错误信息
-                            });
-                            if (工具回调 != null)
-                                await 工具回调(错误信息);
-                            continue;
-                        }
                         Dictionary<string, object> 工具参数 = null;
                         try
                         {
@@ -989,6 +997,37 @@ namespace 淼喵妙神奇工具库
                         }
                         catch { }
                         string toolResult = MCP工具管理器.执行工具(tname, 工具列表, 工具参数, async msg => { if (进度回调 != null) await 进度回调(msg); }, 对话Id上下文, round, 当前计划树, 树修改列表);
+
+                        var 记录ForEval = new 工具调用记录
+                        {
+                            工具ID = tname,
+                            调用时间 = DateTime.Now,
+                            输入参数 = 工具参数 ?? new Dictionary<string, object>(),
+                            是否成功 = !toolResult.Contains("执行失败"),
+                            输出摘要 = toolResult,
+                            对话ID = 对话Id上下文 ?? "",
+                            对话轮次 = round,
+                            调用时计划树 = 当前计划树
+                        };
+                        Task.Run(async () =>
+                        {
+                            try
+                            {
+                                var 经验配置 = 获取经验AI配置();
+                                if (经验配置 != null)
+                                {
+                                    var (quality, match, reason, tags) = await AI使用经验管理器.评估工具调用(经验配置, 记录ForEval).ConfigureAwait(false);
+                                    AI使用经验管理器.更新印象(记录ForEval.工具ID, match, reason, 记录ForEval);
+                                    if (quality == "high")
+                                    {
+                                        var 印象 = AI使用经验管理器.获取工具印象(记录ForEval.工具ID);
+                                        int 印象版本 = 印象.修正历史.Count;
+                                        AI使用经验管理器.追加训练样本(记录ForEval, quality, match, 印象.当前印象, 印象版本);
+                                    }
+                                }
+                            }
+                            catch { }
+                        });
 
                         tcMessages.Add(new Dictionary<string, object>
                         {
@@ -1122,24 +1161,17 @@ namespace 淼喵妙神奇工具库
         {
             var messages = new List<object>();
 
-            var 经验系统消息 = 构建经验系统消息从历史(消息历史);
-            if (!string.IsNullOrEmpty(经验系统消息))
-            {
-                messages.Add(new { role = "system", content = 经验系统消息 });
-            }
+            messages.Add(new { role = "system", content = "【系统通知解读】脚本输出标记: [通知]普通信息→简要告知; [提示]瞬时提示→可选告知; [错误-需关注]→明确指出错误; [警告-请注意]→提醒用户; [交互-确认]已自动选择默认值; [交互-输入]已自动使用默认值; [交互-选择]已自动选第一项; [图片组]有图片生成但AI无法查看; [屏幕截图分析]以下是视觉AI分析结果" });
 
             if (AI配置管理器.获取启用增量记录())
             {
-                messages.Add(new { role = "system", content = "【执行计划提交要求】\n请在首次调用工具前，用以下格式提交你的执行计划：\n[计划]\n需求=你要完成的目标\n步骤=步骤描述|工具ID\n步骤=复杂步骤|*|子步骤1|工具ID|子步骤2|工具ID\n[/计划]\n- 需求= 后写本次要完成的目标描述\n- 步骤=描述|工具ID 表示一个叶子步骤，直接调用对应工具\n- 步骤=描述|*|子步骤1|工具ID|... 表示需分解的内部步骤，*后跟子步骤与工具的配对\n- 计划只需在首次工具调用前提交一次，后续工具调用按计划顺序执行即可" });
+                messages.Add(new { role = "system", content = "【计划要求】首次工具调用前提交计划——格式: [计划]\n需求=目标描述\n步骤=描述|工具ID(叶子步骤)\n步骤=描述|*|子步骤1|工具ID|子步骤2|工具ID(分解步骤)\n[/计划]" });
             }
 
             if (!string.IsNullOrEmpty(自定义规则))
             {
                 messages.Add(new { role = "system", content = 自定义规则 });
             }
-
-            messages.Add(new { role = "system", content = "【系统通知解读指南】\n当脚本执行输出中包含以下标记时，请按对应方式处理：\n- [通知] — 脚本正常运行中产生的普通信息，简要告知用户即可\n- [提示] — 脚本执行过程中的瞬时提示，可选告知用户\n- [错误-需关注] — 脚本遇到了错误，请务必向用户明确指出错误内容，提醒检查脚本配置或运行环境\n- [警告-请注意] — 脚本有潜在问题或需要注意的情况，请提醒用户留意\n- [交互-确认] — 脚本在执行中需要确认，已自动选择默认值继续。如结果显示不理想，可询问用户是否手动调整\n- [交互-输入] — 脚本在执行中需要输入，已自动使用默认值。如结果不符合预期，可询问用户是否手动指定\n- [交互-选择] — 脚本在执行中面临选项，已自动选择第一个选项。如结果不理想，可询问用户是否手动选择\n- [图片组] — 脚本产生了图片结果，但当前AI无法查看完整图片内容，只能看到尺寸摘要。请告知用户有图片生成\n- [屏幕截图分析] — 系统通过多模态视觉AI对当前屏幕进行了分析，以下是分析结果。请结合此信息理解当前屏幕状态" });
-            messages.Add(new { role = "system", content = "【通用MCP工具使用指南】\n除了脚本工具外，系统还提供了以下通用内置工具，可直接调用：\n- ask_vision_ai — 截取当前屏幕并调用视觉AI进行分析，将视觉AI的回复直接返回。你可以传入任意自定义分析Prompt，灵活控制视觉AI的分析内容。当你需要查看用户屏幕上有什么（窗口、按钮、文本内容等）时主动调用此工具。参数：提示词(必填,传给视觉AI的分析提示词,例如'屏幕上有哪些按钮?''登录按钮在什么位置?返回JSON坐标'等)\n- modify_script_remark — 修改当前MCP工具组中某个脚本的备注内容。仅能修改已加载为MCP工具的脚本，不能修改未加载的脚本。当发现脚本备注缺失、描述不准确或无法区分时，在征得用户同意后使用。参数：脚本名或路径、新备注\n- write_log — 将内容写入应用logs目录下的日志文件。适合记录调试信息、脚本运行状态或中间结果。参数：日志名、内容\n- read_log — 读取应用logs目录下的日志文件。可配合write_log使用，写入后读取确认。超过8000字符的内容会自动截断，此时应提醒用户直接查看文件。参数：日志名\n- search_scripts — 在所有已保存的脚本中按关键词搜索，返回匹配脚本的名称、分类和备注摘要。可指定搜索范围（'名称备注'或'完整内容'）和最大结果数。当不知道具体脚本名、想找参考实现时使用。参数：关键词(必填)、搜索范围(可选,默认'名称备注')、最大结果数(可选,默认5)\n- expand_script — 展开查看一个已保存脚本的完整内部结构——显示脚本头部信息（进程名、窗口标题、备注）以及每个节点的类型名和所有字段值。图片/二进制数据会自动省略。用于学习参考已有脚本的实现。参数：脚本标识(必填,脚本文件名不含扩展名)\n- web_search — 通过 Google 搜索引擎搜索互联网上的实时信息。当需要获取最新资讯、事实核查、或用户明确要求搜索时使用。需先在全局设置中配置 Google API Key 和 CX。参数：查询关键词、最大结果数\n\n### search_scripts — 搜索脚本\n在所有已保存脚本中按关键词搜索（不限当前对话加载的工具范围），返回匹配列表。\n- 参数：关键词 (string, 必填)、搜索范围 (string, 可选, '名称备注'默认/'完整内容')、最大结果数 (int, 可选, 默认5)\n- 名称备注模式：只搜索脚本文件名和备注文字，速度快\n- 完整内容模式：额外读取每个脚本文件全文搜索，能找到引用了特定节点的脚本（如搜'单击按键'会返回所有包含此节点的脚本）\n- 结果超过限制时会提示剩余条数，可缩小搜索范围\n- 典型用法：用户说「有没有签到类的脚本可以参考」→ search_scripts('签到')；想知道哪些脚本用了某个节点 → search_scripts('点击图片', '完整内容')\n\n### expand_script — 展开查看脚本\n展开查看一个已保存脚本的内部节点结构（不限当前对话加载的工具范围）。\n- 参数：脚本标识 (string, 必填, 脚本文件名不含.script扩展名)\n- 返回：脚本名、目标进程、窗口标题、备注 → 每个节点的类型名和所有字段值\n- 图片/二进制数据会自动省略，替换为「[图片数据已省略]」或「[数据过长已省略]」\n- 支持精确匹配和模糊匹配（名称Contains），模糊匹配时会提示\n- 典型用法：search_scripts找到参考脚本后 → expand_script('脚本名') 查看节点结构 → 用系统工具模仿创建\n\n### ask_vision_ai - 询问视觉AI\n截取当前屏幕并调用视觉AI（多模态模型，如GPT-4o、Qwen-VL、llava等）进行分析，将视觉AI的回复直接返回。参数：提示词(string, 必填, 自定义分析Prompt)。你可以自由构造分析提示词来实现各种视觉分析需求，如描述屏幕、定位元素、判断状态等。需要先在全局设置中配置视觉AI。\n\n### wait_until_time - 等待时间\n设置一个绝对时间点进行等待，不阻塞对话。时间到达后系统会自动通知你继续执行任务。\n- 参数：绝对时间 (string, 格式 yyyy-MM-dd HH:mm:ss)\n- 调用后立即返回确认消息，你可告知用户等待已设置\n- 注意：每对话同时只能有一个活跃等待，设置新等待会覆盖旧等待\n- 注意：用户在等待期间发送新消息会自动取消等待\n\n### wait_for_event - 等待事件\n监听指定名称的触发任务（TriggerTask），事件触发后系统自动通知你继续。\n- 参数：事件名称 (string, 对应触发任务的名称)、超时分钟 (int, 可选, 默认30)\n- 事件名称需与系统中已配置的触发任务名称完全匹配\n- 调用后立即返回确认消息，等待不阻塞对话\n- 注意：每对话同时只能有一个活跃等待（时间或事件），用户发送新消息会取消等待\n\n### web_search - 联网搜索\n通过 Google 搜索引擎搜索互联网上的实时信息。当需要获取最新资讯、事实核查、或用户明确要求搜索时使用。\n- 参数：查询关键词 (string, 必填)、最大结果数 (int, 可选, 默认5, 范围1-10)\n- 搜索使用 Google 搜索引擎，需要先在全局设置中配置 API 密钥和搜索引擎 ID (CX)\n- 结果包含网页标题、摘要和链接，质量高于免费搜索接口\n- 注意：如搜索无结果建议尝试其他关键词；如提示未配置请联系用户设置\n\n### find_window - 查找窗口\n根据窗口标题获取窗口的屏幕矩形坐标。\n- 参数：窗口标题 (string, 必填, 部分匹配，如'记事本'、'Chrome')\n- 返回JSON：{\"found\": true, \"title\": \"完整标题\", \"rect\": {\"x\":..., \"y\":..., \"width\":..., \"height\":...}} 或 {\"found\": false}\n- 基于Windows API，无需视觉AI\n- 典型用法：find_window('记事本') → 获取窗口位置和大小 → 计算操作区域\n\n### wait_for_ai_reply - 等待AI回复\n等待另一个对话中的AI完成输出，获取最后一条消息内容后继续执行。\n- 参数：对话名 (string, 必填, 目标对话名称)、超时分钟 (int, 可选, 默认30)\n- 仅当目标对话AI自然完成输出时触发，用户手动停止不会触发\n- 调用后立即返回确认消息，等待不阻塞对话\n- 注意：每对话同时只能有一个活跃等待，用户发送新消息会取消等待\n- 典型用法：对话A生成脚本 → 对话B: wait_for_ai_reply('对话A') → 获得脚本内容后继续处理\n\n## 脚本学习与模仿工作流\n当用户要求参考已有脚本创建类似脚本时，建议按以下流程：\n1. search_scripts(关键词) — 先搜索是否有相关的参考脚本\n2. expand_script(脚本名) — 展开查看参考脚本的完整节点结构\n3. 理解参考脚本中每个节点的类型、参数和跳转逻辑\n4. 使用系统工具（create_working_script → add_node → save_script）模仿创建\n\n使用建议：ask_vision_ai适合需要查看屏幕的场景，write_log和read_log可配合使用完成日志记录与审查；modify_script_remark应在用户明确同意后才执行；search_scripts和expand_script是脚本学习的重要入口\n\n### 工具执行进度提示\n当 AI 调用脚本工具时，系统会实时显示每个节点的执行进度（格式：\"{节点名称}已执行/已等待{X.X}s  {索引}/{总数}\"）。\n如需隐藏进度（适用于长脚本或不需要用户感知的静默执行），可在调用工具时添加参数 \"__隐藏进度\": true。\n- find_window — 根据窗口标题（部分匹配）查找可见窗口，返回窗口的屏幕矩形坐标和大小。参数：窗口标题(必填,部分匹配即可)\n- wait_for_ai_reply — 等待另一个对话中的AI完成输出，返回最后一条消息内容。用于对话间协同，例如等另一个对话处理完后再继续。参数：对话名(必填,目标对话名称), 超时分钟(可选,默认30)" });
 
             foreach (var msg in 消息历史)
             {
@@ -1185,26 +1217,12 @@ namespace 淼喵妙神奇工具库
         {
             var sb = new StringBuilder();
 
-            var 经验系统消息 = 构建经验系统消息从历史(消息历史);
-            if (!string.IsNullOrEmpty(经验系统消息))
-            {
-                sb.AppendLine(经验系统消息);
-                sb.AppendLine();
-            }
+            sb.AppendLine("【系统通知解读】脚本输出标记: [通知]→普通信息; [提示]→可选告知; [错误-需关注]→明确指出; [警告-请注意]→提醒用户; [交互-确认/输入/选择]→已自动选择默认值; [图片组]→有图片生成; [屏幕截图分析]→以下是视觉AI分析结果");
+            sb.AppendLine();
 
             if (AI配置管理器.获取启用增量记录())
             {
-                sb.AppendLine("【执行计划提交要求】");
-                sb.AppendLine("请在首次调用工具前，用以下格式提交你的执行计划：");
-                sb.AppendLine("[计划]");
-                sb.AppendLine("需求=你要完成的目标");
-                sb.AppendLine("步骤=步骤描述|工具ID");
-                sb.AppendLine("步骤=复杂步骤|*|子步骤1|工具ID|子步骤2|工具ID");
-                sb.AppendLine("[/计划]");
-                sb.AppendLine("- 需求= 后写本次要完成的目标描述");
-                sb.AppendLine("- 步骤=描述|工具ID 表示一个叶子步骤，直接调用对应工具");
-                sb.AppendLine("- 步骤=描述|*|子步骤1|工具ID|... 表示需分解的内部步骤，*后跟子步骤与工具的配对");
-                sb.AppendLine("- 计划只需在首次工具调用前提交一次，后续工具调用按计划顺序执行即可");
+                sb.AppendLine("【计划要求】首次工具调用前提交计划——格式: [计划]\n需求=目标描述\n步骤=描述|工具ID(叶子步骤)\n步骤=描述|*|子步骤1|工具ID|子步骤2|工具ID(分解步骤)\n[/计划]");
                 sb.AppendLine();
             }
 
@@ -1215,162 +1233,8 @@ namespace 淼喵妙神奇工具库
                 sb.AppendLine();
             }
 
-            sb.AppendLine("【系统通知解读指南】");
-            sb.AppendLine("当脚本执行输出中包含以下标记时，请按对应方式处理：");
-            sb.AppendLine("- [通知] — 脚本正常运行中产生的普通信息，简要告知用户即可");
-            sb.AppendLine("- [提示] — 脚本执行过程中的瞬时提示，可选告知用户");
-            sb.AppendLine("- [错误-需关注] — 脚本遇到了错误，请务必向用户明确指出错误内容，提醒检查脚本配置或运行环境");
-            sb.AppendLine("- [警告-请注意] — 脚本有潜在问题或需要注意的情况，请提醒用户留意");
-            sb.AppendLine("- [交互-确认] — 脚本在执行中需要确认，已自动选择默认值继续。如结果显示不理想，可询问用户是否手动调整");
-            sb.AppendLine("- [交互-输入] — 脚本在执行中需要输入，已自动使用默认值。如结果不符合预期，可询问用户是否手动指定");
-            sb.AppendLine("- [交互-选择] — 脚本在执行中面临选项，已自动选择第一个选项。如结果不理想，可询问用户是否手动选择");
-            sb.AppendLine("- [图片组] — 脚本产生了图片结果，但当前AI无法查看完整图片内容，只能看到尺寸摘要。请告知用户有图片生成");
-            sb.AppendLine("- [屏幕截图分析] — 系统通过多模态视觉AI对当前屏幕进行了分析，以下是分析结果。请结合此信息理解当前屏幕状态");
+            sb.AppendLine("【通用MCP工具指南】工具说明见上方工具列表。关键工作流: list_all_scripts检查已有脚本→get_node_creation_rules了解规则→create_working_script初始化→逐节点add_node构建→execute_node测试→modify_node修复→save_script保存。循环通过成功后跳转实现,备注标注循环开始/结束。保存前自查: 正确性>稳定性>可读性>效率>名字明确度>备注明确度。命名用动宾结构(如'点击签到按钮')。禁止高危操作。执行进度可控,添加__隐藏进度参数可静默执行。");
             sb.AppendLine();
-            sb.AppendLine("【通用MCP工具使用指南】");
-            sb.AppendLine("除了脚本工具外，系统还提供了以下通用内置工具，可直接调用：");
-            sb.AppendLine("- ask_vision_ai — 截取当前屏幕并调用视觉AI进行分析，将视觉AI的回复直接返回。你可以传入任意自定义分析Prompt，灵活控制视觉AI的分析内容。当你需要查看用户屏幕上有什么（窗口、按钮、文本内容等）时主动调用此工具。参数：提示词(必填,传给视觉AI的分析提示词,例如'屏幕上有哪些按钮?''登录按钮在什么位置?返回JSON坐标'等)");
-            sb.AppendLine("- modify_script_remark — 修改当前MCP工具组中某个脚本的备注内容。仅能修改已加载为MCP工具的脚本，不能修改未加载的脚本。当发现脚本备注缺失、描述不准确或无法区分时，在征得用户同意后使用。参数：脚本名或路径、新备注");
-            sb.AppendLine("- write_log — 将内容写入应用logs目录下的日志文件。适合记录调试信息、脚本运行状态或中间结果。参数：日志名、内容");
-            sb.AppendLine("- read_log — 读取应用logs目录下的日志文件。可配合write_log使用，写入后读取确认。超过8000字符的内容会自动截断，此时应提醒用户直接查看文件。参数：日志名");
-            sb.AppendLine("- search_scripts — 在所有已保存的脚本中按关键词搜索（不限当前对话加载的工具范围），返回匹配脚本的名称、分类和备注摘要。参数：关键词(必填)、搜索范围(可选,'名称备注'默认/'完整内容')、最大结果数(可选,默认5)");
-            sb.AppendLine("- expand_script — 展开查看一个已保存脚本的内部节点结构（不限当前对话加载的工具范围），显示头部信息和每个节点的类型名与字段值。图片数据自动省略。参数：脚本标识(必填,脚本文件名不含扩展名)");
-            sb.AppendLine("- web_search — 通过 Google 搜索引擎搜索互联网上的实时信息。需要先在全局设置中配置 Google API Key 和 CX。参数：查询关键词、最大结果数");
-            sb.AppendLine("- list_node_types — 列出所有可用的节点类型及其关键字段，用于 build_script 时选择正确的节点类型");
-            sb.AppendLine("- get_node_creation_rules — 获取节点创建的规则表，包括鼠标操作优先级、等待策略、循环构建方式等");
-            sb.AppendLine("- create_working_script — 初始化一个工作脚本，设置进程名和窗口标题。参数：进程名(必填), 窗口标题(必填)");
-            sb.AppendLine("- add_node — 向工作脚本追加一个节点。参数：节点类型(必填), 节点名字(可选), 节点备注(可选), 成功后等待(可选), 失败后等待(可选), 及其他节点特有字段");
-            sb.AppendLine("- remove_node — 从工作脚本中移除指定索引的节点，自动修正其他节点的跳转引用。参数：索引(必填)");
-            sb.AppendLine("- modify_node — 修改工作脚本中指定节点的字段值。参数：索引(必填), 参数字典(必填,JSON对象)");
-            sb.AppendLine("- execute_node — 单独执行工作脚本中指定索引的节点，用于测试。参数：索引(必填)");
-            sb.AppendLine("- save_script — 将当前工作脚本序列化保存为.script文件。参数：脚本名(必填), 备注(可选), 分类名(可选,默认'未分类')");
-            sb.AppendLine("- list_all_scripts — 列出系统中所有已保存的脚本文件及其分类信息");
-            sb.AppendLine("- classify_script — 将指定脚本移动到目标分类。参数：脚本名或路径(必填), 目标分类(必填)");
-            sb.AppendLine("- edit_category_rule — 编辑指定分类的AI规则。参数：分类名(必填), AI规则(必填)");
-            sb.AppendLine("- create_category — 创建新的脚本分类。参数：分类名(必填), 父分类(可选)");
-            sb.AppendLine();
-            sb.AppendLine("### search_scripts - 搜索脚本");
-            sb.AppendLine("在所有已保存脚本中按关键词搜索。参数：关键词(必填)、搜索范围(可选,'名称备注'/'完整内容')、最大结果数(可选,默认5)。完整内容模式会读取脚本文件全文搜索，能找到引用了特定节点的脚本。");
-            sb.AppendLine();
-            sb.AppendLine("### expand_script - 展开查看脚本");
-            sb.AppendLine("展开查看脚本的完整节点结构。参数：脚本标识(必填,脚本文件名不含扩展名)。返回头部信息+每个节点的类型名和字段值，图片/二进制数据自动省略。支持精确和模糊匹配。");
-            sb.AppendLine();
-            sb.AppendLine("## 脚本学习与模仿工作流");
-            sb.AppendLine("当需要参考已有脚本创建类似脚本时：");
-            sb.AppendLine("1. search_scripts(关键词) → 找参考脚本");
-            sb.AppendLine("2. expand_script(脚本名) → 查看节点结构");
-            sb.AppendLine("3. get_node_creation_rules → 了解节点创建规则");
-            sb.AppendLine("4. create_working_script → add_node → save_script 逐步构建");
-            sb.AppendLine();
-            sb.AppendLine("### ask_vision_ai - 询问视觉AI");
-            sb.AppendLine("截取当前屏幕并调用视觉AI（多模态模型，如GPT-4o、Qwen-VL、llava等）进行分析，将视觉AI的回复直接返回。参数：提示词(string, 必填, 自定义分析Prompt)。你可以自由构造分析提示词来实现各种视觉分析需求，如描述屏幕、定位元素、判断状态等。需要先在全局设置中配置视觉AI。");
-            sb.AppendLine();
-            sb.AppendLine("### wait_until_time - 等待时间");
-            sb.AppendLine("设置一个绝对时间点进行等待，不阻塞对话。时间到达后系统会自动通知你继续执行任务。");
-            sb.AppendLine("- 参数：绝对时间 (string, 格式 yyyy-MM-dd HH:mm:ss)");
-            sb.AppendLine("- 调用后立即返回确认消息，你可告知用户等待已设置");
-            sb.AppendLine("- 注意：每对话同时只能有一个活跃等待，设置新等待会覆盖旧等待");
-            sb.AppendLine("- 注意：用户在等待期间发送新消息会自动取消等待");
-            sb.AppendLine();
-            sb.AppendLine("### wait_for_event - 等待事件");
-            sb.AppendLine("监听指定名称的触发任务（TriggerTask），事件触发后系统自动通知你继续。");
-            sb.AppendLine("- 参数：事件名称 (string, 对应触发任务的名称)、超时分钟 (int, 可选, 默认30)");
-            sb.AppendLine("- 事件名称需与系统中已配置的触发任务名称完全匹配");
-            sb.AppendLine("- 调用后立即返回确认消息，等待不阻塞对话");
-            sb.AppendLine("- 注意：每对话同时只能有一个活跃等待（时间或事件），用户发送新消息会取消等待");
-            sb.AppendLine();
-            sb.AppendLine("### web_search - 联网搜索");
-            sb.AppendLine("通过 Google 搜索引擎搜索互联网上的实时信息。当需要获取最新资讯、事实核查、或用户明确要求搜索时使用。");
-            sb.AppendLine("- 参数：查询关键词 (string, 必填)、最大结果数 (int, 可选, 默认5, 范围1-10)");
-            sb.AppendLine("- 搜索使用 Google 搜索引擎，需要先在全局设置中配置 API 密钥和搜索引擎 ID (CX)");
-            sb.AppendLine("- 结果包含网页标题、摘要和链接，质量高于免费搜索接口");
-            sb.AppendLine("- 注意：如搜索无结果建议尝试其他关键词；如提示未配置请联系用户设置");
-            sb.AppendLine();
-            sb.AppendLine("### list_node_types - 列出节点类型");
-            sb.AppendLine("列出所有可用的节点类型及其关键字段，按分类组织。用于了解可用节点和 add_node 时选择正确类型。");
-            sb.AppendLine();
-            sb.AppendLine("### get_node_creation_rules - 节点创建规则");
-            sb.AppendLine("获取构建脚本的规则表：鼠标操作优先级、等待策略、循环构建方式等。在构建脚本前必调用。");
-            sb.AppendLine();
-            sb.AppendLine("### create_working_script - 创建工作脚本");
-            sb.AppendLine("初始化一个内存中的工作脚本。参数：进程名(string, 必填), 窗口标题(string, 必填)。创建后即可用 add_node 添加节点。");
-            sb.AppendLine();
-            sb.AppendLine("### add_node - 添加节点");
-            sb.AppendLine("向工作脚本追加一个节点。参数：节点类型(string, 必填, 如'点击图片'、'输入文本'等), 节点名字(string, 可选), 节点备注(string, 可选), 成功后等待(int, 可选, 默认500ms), 失败后等待(int, 可选, 默认与成功后相同), 其他节点特有字段按需传入。必须先调用 list_node_types 了解可用类型。");
-            sb.AppendLine();
-            sb.AppendLine("### remove_node - 移除节点");
-            sb.AppendLine("从工作脚本中移除指定索引的节点，自动修正其他节点的跳转引用。参数：索引(int, 必填, 从0开始)。");
-            sb.AppendLine();
-            sb.AppendLine("### modify_node - 修改节点");
-            sb.AppendLine("修改工作脚本中指定节点的字段值。参数：索引(int, 必填), 参数字典(object, 必填, JSON对象, 键为字段名值为新值)。可修改基类字段：节点名字、节点备注、成功后等待、失败后等待。");
-            sb.AppendLine();
-            sb.AppendLine("### execute_node - 执行节点");
-            sb.AppendLine("单独执行工作脚本中指定索引的节点，用于测试节点是否正确。参数：索引(int, 必填)。返回执行结果（成功/失败）。仅在必要时测试关键节点，避免误操作。");
-            sb.AppendLine();
-            sb.AppendLine("### save_script - 保存脚本");
-            sb.AppendLine("将当前工作脚本序列化保存为.script文件并注册到分类中。参数：脚本名(string, 必填), 备注(string, 可选), 分类名(string, 可选, 默认'未分类')。");
-            sb.AppendLine();
-            sb.AppendLine("### list_all_scripts - 列出所有脚本");
-            sb.AppendLine("列出系统中所有已保存的脚本文件及其分类信息。在开始构建前调用，检查是否已有匹配的脚本。");
-            sb.AppendLine();
-            sb.AppendLine("### classify_script - 分类脚本");
-            sb.AppendLine("将指定脚本移动到目标分类。参数：脚本名或路径(string, 必填), 目标分类(string, 必填)。");
-            sb.AppendLine();
-            sb.AppendLine("### edit_category_rule - 编辑分类规则");
-            sb.AppendLine("编辑指定分类的AI规则。参数：分类名(string, 必填), AI规则(string, 必填, 新规则内容)。");
-            sb.AppendLine();
-            sb.AppendLine("### create_category - 创建分类");
-            sb.AppendLine("创建新的脚本分类。参数：分类名(string, 必填), 父分类(string, 可选, 默认创建在根目录)。");
-            sb.AppendLine();
-            sb.AppendLine("### find_window - 查找窗口");
-            sb.AppendLine("根据窗口标题获取窗口的屏幕矩形坐标。参数：窗口标题(string, 必填, 部分匹配)。基于Windows API，返回JSON含found/title/rect。");
-            sb.AppendLine();
-            sb.AppendLine("### wait_for_ai_reply - 等待AI回复");
-            sb.AppendLine("等待另一个对话中的AI完成输出并返回最后一条消息内容。参数：对话名(string, 必填), 超时分钟(int, 可选, 默认30)。仅自然完成触发，用户手动停止不触发。");
-            sb.AppendLine();
-            sb.AppendLine("## 工作流程");
-            sb.AppendLine("1. 调用 list_all_scripts 检查是否已有匹配脚本。若无，继续以下步骤");
-            sb.AppendLine("2. 调用 get_node_creation_rules 了解节点创建规则（鼠标优先级、等待策略等）");
-            sb.AppendLine("3. 调用 create_working_script 初始化工作脚本");
-            sb.AppendLine("4. 逐节点调用 add_node 构建脚本（设名字、备注、等待时间）");
-            sb.AppendLine("5. 调用 execute_node 测试关键节点（打开应用、关键点击等）");
-            sb.AppendLine("6. 调用 modify_node 修复问题（调整等待时间、改名字等）");
-            sb.AppendLine("7. 调用 save_script 保存 → classify_script 分类 → 报告用户");
-            sb.AppendLine();
-            sb.AppendLine("## 循环检测");
-            sb.AppendLine("审查节点列表时：");
-            sb.AppendLine("- 如果操作模式重复（如 签到→确认→返回→签到），识别为循环");
-            sb.AppendLine("- 将循环末节点设为成功后跳转到循环首节点");
-            sb.AppendLine("- 确保失败后跳转指向停止任务或下一段落");
-            sb.AppendLine("- 在节点备注标注「循环开始」「循环结束」");
-            sb.AppendLine();
-            sb.AppendLine("## 加权质量评估（save_script 前必须自查）");
-            sb.AppendLine("| 维度 | 权重 | 检查项 |");
-            sb.AppendLine("|------|------|--------|");
-            sb.AppendLine("| 正确性 | 最高 | 流程能否完整执行？每个循环是否在正确页面状态完成？ |");
-            sb.AppendLine("| 稳定性 | 较高 | 等待时间是否合理？关键步骤是否有失败跳转路径？ |");
-            sb.AppendLine("| 可读性 | 中等 | 节点名字是否清晰有意义？ |");
-            sb.AppendLine("| 效率 | 中等 | 等待时间是否足够短？有无冗余操作？ |");
-            sb.AppendLine("| 名字明确度 | 中等 | 节点名字是否准确反映动作（动宾结构）？ |");
-            sb.AppendLine("| 备注明确度 | 最低 | 节点备注是否补充了名字未涵盖的上下文？ |");
-            sb.AppendLine("发现问题先 modify_node 修复，再 save_script。");
-            sb.AppendLine();
-            sb.AppendLine("## 命名要求");
-            sb.AppendLine("- 节点名字：使用动宾结构，准确反映动作（如「点击签到按钮」「输入用户名」）");
-            sb.AppendLine("- 节点备注：补充上下文信息（如「此按钮可能在登录后弹窗中出现」）");
-            sb.AppendLine("- 不同节点名字应明显区分");
-            sb.AppendLine();
-            sb.AppendLine("## 安全约束");
-            sb.AppendLine("- 禁止高危操作（删除系统文件、修改注册表、格式化磁盘等）");
-            sb.AppendLine("- 如用户需求涉及高危操作，应拒绝并说明原因");
-            sb.AppendLine("- execute_node 仅在必要时测试，避免误操作");
-            sb.AppendLine();
-            sb.AppendLine("使用建议：write_log和read_log可配合使用完成日志记录与审查；modify_script_remark应在用户明确同意后才执行");
-            sb.AppendLine();
-            sb.AppendLine();
-            sb.AppendLine("### 工具执行进度提示");
-            sb.AppendLine("当 AI 调用脚本工具时，系统会实时显示每个节点的执行进度（格式：\"{节点名称}已执行/已等待{X.X}s  {索引}/{总数}\"）。");
-            sb.AppendLine("如需隐藏进度（适用于长脚本或不需要用户感知的静默执行），可在调用工具时添加参数 \"__隐藏进度\": true。");
 
             foreach (var msg in 消息历史)
             {
@@ -1408,7 +1272,7 @@ namespace 淼喵妙神奇工具库
         public static bool 配置是否有效(AIConfigData config)
         {
             if (config == null) return false;
-            if (config.提供者类型 == "Ollama本地")
+            if (解析提供者(config) == "Ollama本地")
             {
                 return !string.IsNullOrEmpty(config.Ollama地址);
             }
@@ -1416,12 +1280,6 @@ namespace 淼喵妙神奇工具库
             {
                 return !string.IsNullOrEmpty(config.远程API地址) && !string.IsNullOrEmpty(config.加密API密钥);
             }
-        }
-
-        public static AIConfigData 获取评审AI配置()
-        {
-            var cfg = 根据Id获取配置(_数据.评审AI配置Id);
-            return cfg ?? 获取全局配置();
         }
 
         public static List<AINamedConfig> 获取配置列表()
@@ -1455,8 +1313,8 @@ namespace 淼喵妙神奇工具库
 
                     if (_数据.视觉AI配置Id == id)
                         _数据.视觉AI配置Id = 第一Id;
-                    if (_数据.评审AI配置Id == id)
-                        _数据.评审AI配置Id = 第一Id;
+                    if (_数据.经验AI配置Id == id)
+                        _数据.经验AI配置Id = 第一Id;
                     if (_数据.上次文本配置Id == id)
                         _数据.上次文本配置Id = 第一Id;
                     if (_数据.上次多模态配置Id == id)
@@ -1517,52 +1375,6 @@ namespace 淼喵妙神奇工具库
         public static string 获取上次多模态配置Id()
         {
             return _数据.上次多模态配置Id;
-        }
-
-        private static string 构建经验系统消息从历史(List<AIChatMessage> 消息历史)
-        {
-            var 工具ID列表 = 提取工具ID从消息历史(消息历史);
-            return AI使用经验管理器.构建经验系统消息(工具ID列表);
-        }
-
-        private static List<string> 提取工具ID从消息历史(List<AIChatMessage> 消息历史)
-        {
-            var 工具ID集 = new HashSet<string>();
-            foreach (var msg in 消息历史)
-            {
-                if (msg.角色 == "AI" && !string.IsNullOrEmpty(msg.内容))
-                {
-                    var 匹配 = Regex.Matches(msg.内容, @"<tool_call>([^<]+)</tool_call>");
-                    foreach (Match m in 匹配)
-                        if (m.Groups.Count > 1)
-                            工具ID集.Add(m.Groups[1].Value.Trim());
-                }
-            }
-            return 工具ID集.ToList();
-        }
-
-        private static bool 工具在计划内(string 工具ID, 计划节点 计划)
-        {
-            if (计划 == null) return true;
-            return 查找计划叶子工具(计划).Contains(工具ID);
-        }
-
-        private static HashSet<string> 查找计划叶子工具(计划节点 计划)
-        {
-            var 结果 = new HashSet<string>();
-            if (计划 == null) return 结果;
-            if (计划.子步骤.Count == 0)
-            {
-                if (!string.IsNullOrEmpty(计划.工具ID))
-                    结果.Add(计划.工具ID);
-                return 结果;
-            }
-            foreach (var 子 in 计划.子步骤)
-            {
-                foreach (var id in 查找计划叶子工具(子))
-                    结果.Add(id);
-            }
-            return 结果;
         }
 
         private class 流式思考解析器

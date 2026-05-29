@@ -52,18 +52,9 @@ namespace 淼喵妙用户界面.ViewModels
             get => _isAIPage;
             set
             {
-                bool wasAIPage = _isAIPage;
                 _isAIPage = value;
                 OnPropertyChanged(nameof(IsAIPage));
                 OnPropertyChanged(nameof(IsHomePage));
-
-                if (wasAIPage && !_isAIPage)
-                {
-                    if (AIPage != null && AIPage.有未总结消息)
-                    {
-                        触发AI经验总结();
-                    }
-                }
             }
         }
 
@@ -153,8 +144,18 @@ namespace 淼喵妙用户界面.ViewModels
         private System.Timers.Timer _schedulerTimer;
         private System.Timers.Timer _countdownTimer;
         private System.Timers.Timer _autoSaveTimer;
+        private System.Timers.Timer _训练倒计时定时器;
         private bool _isProcessingQueue = false;
         private bool _needsSave = false;
+
+        public bool 窗口在托盘中 { get; private set; }
+
+        private string _训练进度 = "";
+        public string 训练进度
+        {
+            get => _训练进度;
+            set { _训练进度 = value; OnPropertyChanged(nameof(训练进度)); }
+        }
 
         private 远程指令配置数据 _远程指令配置 = new 远程指令配置数据();
         public 远程指令配置数据 远程指令配置
@@ -1746,22 +1747,63 @@ namespace 淼喵妙用户界面.ViewModels
             }
         }
 
-        private async void 触发AI经验总结()
+        public void 窗口已隐藏到托盘()
         {
-            if (!AI配置管理器.获取启用自主学习()) return;
-            try
+            窗口在托盘中 = true;
+            _训练倒计时定时器?.Stop();
+            _训练倒计时定时器 = new System.Timers.Timer(5 * 60 * 1000);
+            _训练倒计时定时器.Elapsed += async (s, e) =>
             {
-                var 对话 = AI配置管理器.获取当前对话();
-                if (对话 == null) return;
-                var 总结AI配置 = AI配置管理器.获取全局配置();
-                await AI使用经验管理器.触发经验总结(对话, 总结AI配置);
-                AIPage?.重置新消息计数();
-            }
-            catch { }
+                _训练倒计时定时器?.Stop();
+                if (窗口在托盘中 && !AI配置管理器.是否训练中)
+                {
+                    AI配置管理器.是否训练中 = true;
+                    await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                    {
+                        训练进度 = "训练准备中...";
+                    });
+                    await AI使用经验管理器.执行完整训练管线(msg =>
+                    {
+                        System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                        {
+                            训练进度 = msg;
+                        });
+                    }).ConfigureAwait(false);
+                    AI配置管理器.是否训练中 = false;
+                    System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                    {
+                        训练进度 = "训练完成";
+                    });
+                }
+            };
+            _训练倒计时定时器.AutoReset = false;
+            _训练倒计时定时器.Start();
+        }
+
+        public void 窗口已从托盘恢复()
+        {
+            窗口在托盘中 = false;
+            _训练倒计时定时器?.Stop();
+        }
+
+        public async Task 手动触发训练()
+        {
+            if (AI配置管理器.是否训练中) return;
+            AI配置管理器.是否训练中 = true;
+            训练进度 = "手动训练启动...";
+            await AI使用经验管理器.执行完整训练管线(msg =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    训练进度 = msg;
+                });
+            }).ConfigureAwait(false);
+            AI配置管理器.是否训练中 = false;
+            训练进度 = "训练完成";
         }
 
         /// <summary>
-        /// 释放所有资源 - 停止并释放4个Timer
+        /// 释放所有资源 - 停止并释放Timer
         /// </summary>
         public void Dispose()
         {
@@ -1771,6 +1813,8 @@ namespace 淼喵妙用户界面.ViewModels
             _countdownTimer?.Dispose();
             _autoSaveTimer?.Stop();
             _autoSaveTimer?.Dispose();
+            _训练倒计时定时器?.Stop();
+            _训练倒计时定时器?.Dispose();
         }
     }
 }

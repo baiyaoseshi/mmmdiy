@@ -22,9 +22,8 @@ namespace 淼喵妙神奇工具库
         public List<string> 祖先AI规则列表 { get; set; } = new List<string>();
         public List<string> 祖先分类路径列表 { get; set; } = new List<string>();
         public object 参数Schema { get; set; }
-        public bool 已有使用经验 { get; set; }
-        public string 经验更新时间 { get; set; } = "";
         public bool 已有统计数据 { get; set; }
+        public string 脚本Id { get; set; } = "";
     }
 
     public static class MCP工具管理器
@@ -54,6 +53,7 @@ namespace 淼喵妙神奇工具库
             return sb.ToString();
         }
 
+        // 保留用于向后兼容，新工具ID生成已改用GUID-based方案
         public static string 生成ASCII工具名(string 原始名称)
         {
             if (string.IsNullOrEmpty(原始名称)) return "tool_empty";
@@ -105,14 +105,6 @@ namespace 淼喵妙神奇工具库
                 tools[i].工具ID = 唯一ID;
             }
 
-            for (int i = 0; i < tools.Count; i++)
-            {
-                var (已有使用经验, 经验更新时间, 已有统计数据) = AI使用经验管理器.获取经验状态(tools[i].工具ID);
-                tools[i].已有使用经验 = 已有使用经验;
-                tools[i].经验更新时间 = 经验更新时间;
-                tools[i].已有统计数据 = 已有统计数据;
-            }
-
             return tools;
         }
 
@@ -127,7 +119,20 @@ namespace 淼喵妙神奇工具库
 
                     var (名称, 备注) = 解析脚本信息(脚本路径);
 
-                    string 基础ID = 生成ASCII工具名(名称);
+                    string 脚本Id;
+                    try
+                    {
+                        var script = new 键鼠库.动作.自动任务脚本(IntPtr.Zero, File.ReadAllText(脚本路径));
+                        脚本Id = script.脚本Id;
+                        if (string.IsNullOrEmpty(脚本Id))
+                            脚本Id = Guid.NewGuid().ToString("N");
+                    }
+                    catch
+                    {
+                        脚本Id = Guid.NewGuid().ToString("N");
+                    }
+
+                    string 基础ID = "tool_" + 脚本Id.Substring(0, 12);
 
                     工具列表.Add(new MCPToolDefinition
                     {
@@ -138,7 +143,8 @@ namespace 淼喵妙神奇工具库
                         分类路径 = 完整名,
                         分类AI规则 = category.AI规则 ?? "",
                         祖先AI规则列表 = new List<string>(祖先规则),
-                        祖先分类路径列表 = new List<string>(祖先分类路径)
+                        祖先分类路径列表 = new List<string>(祖先分类路径),
+                        脚本Id = 脚本Id
                     });
                 }
             }
@@ -165,10 +171,22 @@ namespace 淼喵妙神奇工具库
             {
                 string 分类标记 = string.IsNullOrEmpty(tool.分类路径) || 通用MCP工具.内置工具ID列表.Contains(tool.工具ID)
                     ? "" : $" [分类: {tool.分类路径}]";
+                string 描述 = $"{tool.名称}{分类标记}: {tool.描述}";
+
+                var (有印象, 置信度, _) = AI使用经验管理器.获取工具印象状态(tool.工具ID);
+                if (有印象 && 置信度 >= 0.5f)
+                {
+                    var 印象 = AI使用经验管理器.获取工具印象(tool.工具ID);
+                    if (!string.IsNullOrEmpty(印象.当前印象) && 印象.置信度 >= 0.5f)
+                    {
+                        描述 += $"【印象】{印象.当前印象}（置信度: {印象.置信度 * 100:F0}%）";
+                    }
+                }
+
                 var 功能定义 = new Dictionary<string, object>
                 {
                     ["name"] = tool.工具ID,
-                    ["description"] = $"{tool.名称}{分类标记}: {tool.描述}"
+                    ["description"] = 描述
                 };
                 if (tool.参数Schema != null)
                     功能定义["parameters"] = tool.参数Schema;

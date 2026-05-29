@@ -2,10 +2,12 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using 淼喵妙神奇工具库;
 using 淼喵妙神奇工具库.输出库;
+using 淼喵妙用户界面.ViewModels;
 
 namespace 淼喵妙用户界面.Controls
 {
@@ -54,6 +56,19 @@ namespace 淼喵妙用户界面.Controls
             EnableStatisticsCheckBox.IsChecked = AI配置管理器.获取启用增量记录();
             FilterPrivateMessagesCheckBox.IsChecked = AI配置管理器.获取过滤私有消息();
             更新快捷指令列表(AI配置管理器.获取全局快捷指令());
+
+            var ollama列表 = 原始列表
+                .Where(c => c.配置?.提供者类型 == "Ollama本地" && !string.IsNullOrEmpty(c.配置?.Ollama模型))
+                .ToList();
+            var 经验Id = ExperienceAIConfigComboBox;
+            if (经验Id != null)
+            {
+                经验Id.ItemsSource = null;
+                经验Id.ItemsSource = ollama列表;
+                经验Id.DisplayMemberPath = "名称";
+                if (ollama列表.Count > 0)
+                    经验Id.SelectedIndex = 0;
+            }
         }
 
         private void 保存编辑器值到当前配置()
@@ -229,13 +244,49 @@ namespace 淼喵妙用户界面.Controls
                 完整Prompt = c.完整Prompt
             }).ToList());
 
+            if (ExperienceAIConfigComboBox?.SelectedItem is AINamedConfig 选中经验)
+                AI配置管理器.更新经验AI配置(选中经验.Id);
+
             保存?.Invoke();
         }
 
         private void ClearLearningCache_Click(object sender, RoutedEventArgs e)
         {
-            AI使用经验管理器.清空所有经验();
-            通知工具.信息弹窗("自主学习缓存已清除（包含所有工具经验和调用记录）。");
+            AI使用经验管理器.清空所有统计();
+            通知工具.信息弹窗("工具调用统计数据已清除。");
+        }
+
+        private async void StartTraining_Click(object sender, RoutedEventArgs e)
+        {
+            var mainVM = System.Windows.Application.Current.MainWindow?.DataContext as MainWindowViewModel;
+            if (mainVM == null) return;
+            await mainVM.手动触发训练();
+        }
+
+        private void CleanData_Click(object sender, RoutedEventArgs e)
+        {
+            AI使用经验管理器.数据清洗();
+            通知工具.信息弹窗("数据清洗完成。");
+        }
+
+        private void BuildEvalSet_Click(object sender, RoutedEventArgs e)
+        {
+            AI使用经验管理器.构建评测集();
+            通知工具.信息弹窗("评测集构建完成。");
+        }
+
+        private void ClearImpressions_Click(object sender, RoutedEventArgs e)
+        {
+            if (!通知工具.确认弹窗("确认清空所有工具印象？此操作不可恢复。"))
+                return;
+            AI使用经验管理器.清空所有印象();
+            通知工具.信息弹窗("所有工具印象已清空。");
+        }
+
+        private void ViewTrainingStats_Click(object sender, RoutedEventArgs e)
+        {
+            var stats = AI使用经验管理器.获取训练数据统计();
+            通知工具.信息弹窗($"训练数据统计：\n总样本数: {stats.总样本数}\n高质量: {stats.高质量}\n低质量: {stats.低质量}\n孤立样本: {stats.孤立样本}");
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)

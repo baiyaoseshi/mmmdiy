@@ -148,6 +148,30 @@
                 <Button Content="清除自主学习缓存" Height="30" Margin="0,10,0,0"
                         Background="#FFE53935" Foreground="White" FontSize="12" Click="ClearLearningCache_Click"/>
 
+                <TextBlock Text="模型训练与微调" FontSize="14" FontWeight="Bold" Foreground="#FF333333" Margin="0,14,0,5"/>
+
+                <TextBlock Text="经验 AI 配置（仅 Ollama 本地）" FontSize="12" FontWeight="Bold" Foreground="#FF555555" Margin="0,2"/>
+                <ComboBox x:Name="ExperienceAIConfigComboBox" Margin="0,2,0,10"/>
+
+                <TextBlock Text="训练进度" FontSize="12" FontWeight="Bold" Foreground="#FF555555" Margin="0,4,0,2"/>
+                <TextBlock x:Name="TrainingProgressText" Text="" Foreground="#FF666666" FontSize="11" Margin="0,2,0,5"/>
+
+                <StackPanel Orientation="Horizontal" Margin="0,4">
+                    <Button Content="开始训练" Height="28" Background="#FF4CAF50" Foreground="White"
+                            Click="StartTraining_Click" Margin="0,0,5,0"/>
+                    <Button Content="数据清洗" Height="28" Background="#FFFF9800" Foreground="White"
+                            Click="CleanData_Click" Margin="0,0,5,0"/>
+                    <Button Content="构建评测集" Height="28" Background="#FF2196F3" Foreground="White"
+                            Click="BuildEvalSet_Click" Margin="0,0,5,0"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,4">
+                    <Button Content="清空印象" Height="28" Background="#FFE53935" Foreground="White"
+                            Click="ClearImpressions_Click" Margin="0,0,5,0"/>
+                    <Button Content="查看印象统计" Height="28" Background="#FF9E9E9E" Foreground="White"
+                            Click="ViewTrainingStats_Click"/>
+                </StackPanel>
+
                 <Button x:Name="SaveButton" Content="保存全局设置" Height="35" Margin="0,10,0,10"
                         Background="#FF2196F3" Foreground="White" FontSize="14" Click="SaveButton_Click"/>
             </StackPanel>

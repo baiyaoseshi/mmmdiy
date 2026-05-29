@@ -32,8 +32,6 @@ namespace 淼喵妙用户界面.Controls
         private Task _思考同步Task;
         private AIChatMessage _当前进度消息;
         private CancellationTokenSource _aiCts;
-        private int _本轮新消息数 = 0;
-        public bool 有未总结消息 => _本轮新消息数 > 0;
 
         public class ConversationListItem : INotifyPropertyChanged
         {
@@ -132,7 +130,6 @@ namespace 淼喵妙用户界面.Controls
 
         private void 加载当前对话()
         {
-            重置新消息计数();
 
             var 对话 = AI配置管理器.获取当前对话();
             if (对话 == null)
@@ -351,7 +348,6 @@ namespace 淼喵妙用户界面.Controls
                 if (成功)
                 {
                     更新侧边栏计数(对话.Id);
-                    _本轮新消息数++;
                 }
             }
         }
@@ -364,11 +360,6 @@ namespace 淼喵妙用户界面.Controls
                 var 对话 = AI配置管理器.获取所有对话().FirstOrDefault(d => d.Id == 对话Id);
                 if (对话 != null) item.消息数量 = 对话.消息列表?.Count ?? 0;
             }
-        }
-
-        public void 重置新消息计数()
-        {
-            _本轮新消息数 = 0;
         }
 
         private async Task 处理Spec指令(string input, AIConversation 对话)
@@ -734,7 +725,6 @@ namespace 淼喵妙用户界面.Controls
                     if (成功)
                     {
                         更新侧边栏计数(对话.Id);
-                        _本轮新消息数++;
                     }
                 }
             });

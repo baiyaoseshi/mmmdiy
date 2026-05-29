@@ -83,6 +83,7 @@ namespace 淼喵妙用户界面
             this.Show();
             _notifyIcon.Visible = false;
             this.WindowState = WindowState.Normal;
+            ViewModel?.窗口已从托盘恢复();
         }
 
         /// <summary>
@@ -197,6 +198,7 @@ namespace 淼喵妙用户界面
             this.Hide();
             if (_notifyIcon != null)
                 _notifyIcon.Visible = true;
+            ViewModel?.窗口已隐藏到托盘();
         }
 
         /// <summary>
@@ -207,6 +209,7 @@ namespace 淼喵妙用户界面
             this.Show();
             _notifyIcon.Visible = false;
             this.WindowState = WindowState.Normal;
+            ViewModel?.窗口已从托盘恢复();
         }
     }
 }

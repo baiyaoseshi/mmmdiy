@@ -100,7 +100,7 @@ namespace 淼喵妙神奇工具库
         public List<AIQuickCommand> 全局快捷指令列表 { get; set; } = new List<AIQuickCommand>();
         public List<AIConversation> 对话列表 { get; set; } = new List<AIConversation>();
         public string 视觉AI配置Id { get; set; }
-        public string 评审AI配置Id { get; set; }
+        public string 经验AI配置Id { get; set; }
         public bool 启用自主学习 { get; set; } = false;
         public bool 启用增量记录 { get; set; } = false;
         public bool 过滤私有消息 { get; set; } = true;

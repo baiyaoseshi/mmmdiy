@@ -19,6 +19,7 @@ namespace 淼喵妙神奇工具库.键鼠库.动作
         public string 绑定进程名 = "";
         public string 绑定窗口标题 = "";
         public bool 是否为支线脚本 = false;
+        public string 脚本Id { get; set; } = Guid.NewGuid().ToString("N");
         public 自动任务脚本(IntPtr hWnd)
         {
             节点列表 = new List<控制节点>();
@@ -135,7 +136,18 @@ namespace 淼喵妙神奇工具库.键鼠库.动作
             {
                 绑定进程名 = 头部匹配.Groups[1].Value;
                 绑定窗口标题 = 头部匹配.Groups[2].Value;
-                脚本备注 = 头部信息.Substring(头部匹配.Length).Trim();
+                var 剩余部分 = 头部信息.Substring(头部匹配.Length).Trim();
+                var 脚本Id匹配 = Regex.Match(剩余部分, @"脚本Id\[([a-fA-F0-9]+)\]");
+                if (脚本Id匹配.Success)
+                {
+                    脚本Id = 脚本Id匹配.Groups[1].Value;
+                    脚本备注 = 剩余部分.Substring(0, 脚本Id匹配.Index).Trim();
+                }
+                else
+                {
+                    脚本Id = Guid.NewGuid().ToString("N");
+                    脚本备注 = 剩余部分;
+                }
             }
             else
             {
@@ -208,7 +220,7 @@ namespace 淼喵妙神奇工具库.键鼠库.动作
             StringBuilder sb = new StringBuilder();
             if (是否为支线脚本)
                 sb.Append($"支线脚本[True]");
-            sb.Append($"进程名[{绑定进程名}]窗口标题[{绑定窗口标题}]{脚本备注}");
+            sb.Append($"进程名[{绑定进程名}]窗口标题[{绑定窗口标题}]{脚本备注}脚本Id[{脚本Id}]");
             foreach (var 节点 in 节点列表)
                 sb.Append(节点.保存为字符串(this));
             return sb.ToString();

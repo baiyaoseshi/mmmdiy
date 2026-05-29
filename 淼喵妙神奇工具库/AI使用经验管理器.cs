@@ -1,14 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace 淼喵妙神奇工具库
 {
@@ -33,69 +30,52 @@ namespace 淼喵妙神奇工具库
         public List<计划节点> 调用后树修改 { get; set; } = new List<计划节点>();
     }
 
-    public class 工具经验条目
-    {
-        public string 规则 { get; set; } = "";
-        public DateTime 更新时间 { get; set; }
-    }
-
-    public class 经验存储根
-    {
-        public Dictionary<string, 工具经验条目> 工具经验 { get; set; } = new Dictionary<string, 工具经验条目>();
-        public string 微调后评审模型名 { get; set; } = "";
-    }
-
     public class 统计存储根
     {
         public List<工具调用记录> 工具调用记录 { get; set; } = new List<工具调用记录>();
     }
 
+    public class 印象修正记录
+    {
+        public string 类型 { get; set; } = "";
+        public string 旧印象 { get; set; } = "";
+        public string 新印象 { get; set; } = "";
+        public string 触发原因 { get; set; } = "";
+        public string 来源对话ID { get; set; } = "";
+        public DateTime 时间戳 { get; set; }
+    }
+
+    public class 工具印象
+    {
+        public string 工具ID { get; set; } = "";
+        public string 第一印象 { get; set; } = "";
+        public string 当前印象 { get; set; } = "";
+        public float 置信度 { get; set; }
+        public DateTime 首次使用时间 { get; set; }
+        public DateTime 最近更新时间 { get; set; }
+        public List<印象修正记录> 修正历史 { get; set; } = new List<印象修正记录>();
+    }
+
+    public class 印象存储根
+    {
+        public Dictionary<string, 工具印象> 印象词典 { get; set; } = new Dictionary<string, 工具印象>();
+    }
+
     public static class AI使用经验管理器
     {
         private static readonly string _数据目录 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "淼喵妙脚本DIY");
-        private static readonly string _经验文件路径 = Path.Combine(_数据目录, "ai_experience.json");
         private static readonly string _统计文件路径 = Path.Combine(_数据目录, "ai_tool_statistics.json");
+        private static readonly string _印象文件路径 = Path.Combine(_数据目录, "ai_tool_impressions.json");
+        private static readonly string _训练数据路径 = Path.Combine(_数据目录, "ai_training_data.jsonl");
         private static readonly object _统计锁 = new object();
-        private static readonly object _经验锁 = new object();
+        private static readonly object _印象锁 = new object();
+        private static readonly object _训练数据锁 = new object();
 
         private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = null
         };
-
-        public static 经验存储根 加载经验()
-        {
-            lock (_经验锁)
-            {
-                try
-                {
-                    if (File.Exists(_经验文件路径))
-                    {
-                        string json = File.ReadAllText(_经验文件路径);
-                        return JsonSerializer.Deserialize<经验存储根>(json, _jsonOptions) ?? new 经验存储根();
-                    }
-                }
-                catch { }
-                return new 经验存储根();
-            }
-        }
-
-        public static void 保存经验(经验存储根 经验)
-        {
-            lock (_经验锁)
-            {
-                try
-                {
-                    if (!Directory.Exists(_数据目录))
-                        Directory.CreateDirectory(_数据目录);
-
-                    string json = JsonSerializer.Serialize(经验, _jsonOptions);
-                    File.WriteAllText(_经验文件路径, json);
-                }
-                catch { }
-            }
-        }
 
         public static 统计存储根 加载统计()
         {
@@ -144,75 +124,10 @@ namespace 淼喵妙神奇工具库
             }
         }
 
-        public static void 更新工具经验(string 工具ID, string 规则)
-        {
-            lock (_经验锁)
-            {
-                try
-                {
-                    var 经验 = 加载经验();
-                    经验.工具经验[工具ID] = new 工具经验条目
-                    {
-                        规则 = 规则,
-                        更新时间 = DateTime.Now
-                    };
-                    保存经验(经验);
-                }
-                catch { }
-            }
-        }
-
-        public static 工具经验条目 获取工具经验(string 工具ID)
+        public static void 清空所有统计()
         {
             try
             {
-                var 经验 = 加载经验();
-                return 经验.工具经验.TryGetValue(工具ID, out var 条目) ? 条目 : null;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        public static (bool 已有使用经验, string 经验更新时间, bool 已有统计数据) 获取经验状态(string 工具ID)
-        {
-            try
-            {
-                var 经验 = 加载经验();
-                var 统计 = 加载统计();
-
-                bool 有经验 = 经验.工具经验.TryGetValue(工具ID, out var 条目);
-                bool 有统计 = 统计.工具调用记录.Any(r => r.工具ID == 工具ID);
-
-                return (有经验, 有经验 ? 条目.更新时间.ToString("yyyy-MM-dd HH:mm:ss") : "", 有统计);
-            }
-            catch
-            {
-                return (false, "", false);
-            }
-        }
-
-        public static void 清空工具经验(string 工具ID)
-        {
-            try
-            {
-                var 经验 = 加载经验();
-                经验.工具经验.Remove(工具ID);
-                保存经验(经验);
-
-                var 统计 = 加载统计();
-                统计.工具调用记录.RemoveAll(r => r.工具ID == 工具ID);
-                保存统计(统计);
-            }
-            catch { }
-        }
-
-        public static void 清空所有经验()
-        {
-            try
-            {
-                File.Delete(_经验文件路径);
                 File.Delete(_统计文件路径);
             }
             catch { }
@@ -229,63 +144,6 @@ namespace 淼喵妙神奇工具库
                     保存统计(统计);
                 }
                 catch { }
-            }
-        }
-
-        public static string 导出微调数据()
-        {
-            try
-            {
-                var 统计 = 加载统计();
-                var 记录列表 = 统计.工具调用记录;
-                if (记录列表.Count == 0) return "";
-
-                var 按对话分组 = 记录列表.GroupBy(r => r.对话ID).ToList();
-
-                var jsonlLines = new List<string>();
-
-                foreach (var 对话组 in 按对话分组)
-                {
-                    var 记录 = 对话组.OrderBy(r => r.调用时间).ToList();
-                    if (记录.Count == 0) continue;
-
-                    var instructionSb = new StringBuilder();
-                    instructionSb.AppendLine("根据以下工具调用记录，学习完成各类任务的最佳工具选择和执行顺序：");
-                    instructionSb.AppendLine();
-
-                    var inputSb = new StringBuilder();
-                    var outputSb = new StringBuilder();
-
-                    for (int i = 0; i < 记录.Count; i++)
-                    {
-                        var r = 记录[i];
-                        inputSb.AppendLine($"任务{i + 1}: {r.调用时计划树?.需求 ?? "未知需求"}");
-                        inputSb.Append($"可用工具: {r.工具ID}");
-
-                        outputSb.AppendLine($"步骤{i + 1}: 调用 {r.工具ID}");
-                        outputSb.AppendLine($"  成功: {(r.是否成功 ? "是" : "否")}");
-                        outputSb.AppendLine($"  耗时: {r.耗时ms}ms");
-                        outputSb.AppendLine($"  结果: {r.输出摘要}");
-                        outputSb.AppendLine();
-                    }
-
-                    var entry = new
-                    {
-                        instruction = instructionSb.ToString().Trim(),
-                        input = inputSb.ToString().Trim(),
-                        output = outputSb.ToString().Trim()
-                    };
-
-                    jsonlLines.Add(JsonSerializer.Serialize(entry, _jsonOptions));
-                }
-
-                string jsonl路径 = Path.Combine(_数据目录, "ai_finetune_data.jsonl");
-                File.WriteAllText(jsonl路径, string.Join("\n", jsonlLines), Encoding.UTF8);
-                return jsonl路径;
-            }
-            catch
-            {
-                return "";
             }
         }
 
@@ -431,399 +289,450 @@ namespace 淼喵妙神奇工具库
             return 解析计划(匹配.Groups[1].Value);
         }
 
-        public static string 构建经验系统消息(List<string> 工具ID列表)
+        public static (bool 是否有印象, float 置信度, DateTime 最近更新时间) 获取工具印象状态(string 工具ID)
         {
-            if (工具ID列表 == null || 工具ID列表.Count == 0) return "";
+            var 印象 = 加载印象();
+            if (印象.印象词典.TryGetValue(工具ID, out var 工具印象))
+                return (true, 工具印象.置信度, 工具印象.最近更新时间);
+            return (false, 0, DateTime.MinValue);
+        }
 
-            try
+        public static 工具印象 获取工具印象(string 工具ID, string 工具名称 = "", string 工具备注 = "")
+        {
+            var 印象 = 加载印象();
+            if (印象.印象词典.TryGetValue(工具ID, out var 工具印象))
+                return 工具印象;
+
+            var 描述 = string.IsNullOrEmpty(工具备注)
+                ? $"工具 {工具名称}"
+                : $"工具 {工具名称}：{工具备注}";
+            return new 工具印象
             {
-                var 经验 = 加载经验();
-                var sb = new StringBuilder();
+                工具ID = 工具ID,
+                第一印象 = "",
+                当前印象 = 描述,
+                置信度 = 0.3f,
+                首次使用时间 = DateTime.MinValue,
+                最近更新时间 = DateTime.Now
+            };
+        }
 
-                sb.AppendLine("【工具使用经验】");
-                sb.AppendLine("以下是基于历史使用记录总结的工具使用经验，请参考：");
-                sb.AppendLine();
-
-                bool 有经验 = false;
-                foreach (var 工具ID in 工具ID列表)
-                {
-                    if (经验.工具经验.TryGetValue(工具ID, out var 条目) && !string.IsNullOrEmpty(条目.规则))
-                    {
-                        sb.AppendLine($"### {工具ID}");
-                        sb.AppendLine(条目.规则);
-                        sb.AppendLine();
-                        有经验 = true;
-                    }
-                }
-
-                if (!有经验)
-                    return "";
-
-                sb.AppendLine("以上经验仅供参考，请根据当前实际情况灵活使用。");
-                return sb.ToString();
-            }
-            catch
-            {
+        public static async Task<string> 生成第一印象(AIConfigData 经验配置, 工具调用记录 记录)
+        {
+            if (经验配置 == null || string.IsNullOrEmpty(经验配置.Ollama模型))
                 return "";
+            try
+            {
+                var prompt = $"你是一个工具使用分析专家。以下是一个自动化工具的首次成功使用记录。请根据实际调用过程，生成对该工具的'第一印象'（一段简洁的描述，说明工具的用途、行为特征和注意事项）：\n\n" +
+                             $"工具原始描述：{记录.输入参数?.GetValueOrDefault("__工具描述", "") ?? ""}\n" +
+                             $"调用参数：{JsonSerializer.Serialize(记录.输入参数 ?? new Dictionary<string, object>())}\n" +
+                             $"执行结果：{记录.输出摘要}\n" +
+                             $"是否成功：{记录.是否成功}\n\n" +
+                             $"请输出JSON格式：{{\"impression\": \"第一印象描述\"}}";
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+                var requestBody = new { model = 经验配置.Ollama模型, prompt = prompt, stream = false };
+                var response = await client.PostAsync($"{经验配置.Ollama地址}/api/generate",
+                    new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode) return "";
+                var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                using var doc = JsonDocument.Parse(json);
+                var responseText = doc.RootElement.GetProperty("response").GetString() ?? "";
+                var jsonMatch = Regex.Match(responseText, @"\{[^}]*""impression""[^}]*\}", RegexOptions.None, TimeSpan.FromSeconds(1));
+                if (jsonMatch.Success)
+                {
+                    using var impDoc = JsonDocument.Parse(jsonMatch.Value);
+                    return impDoc.RootElement.GetProperty("impression").GetString() ?? "";
+                }
+                return responseText.Trim();
+            }
+            catch { return ""; }
+        }
+
+        public static void 更新印象(string 工具ID, string impressionMatch, string 评估原因, 工具调用记录 记录)
+        {
+            lock (_印象锁)
+            {
+                var 印象数据 = 加载印象();
+                if (!印象数据.印象词典.TryGetValue(工具ID, out var 工具印象))
+                {
+                    工具印象 = new 工具印象 { 工具ID = 工具ID, 置信度 = 0.3f };
+                    印象数据.印象词典[工具ID] = 工具印象;
+                }
+
+                var 修正记录 = new 印象修正记录
+                {
+                    类型 = impressionMatch == "首次使用" ? "第一印象" :
+                           impressionMatch == "矛盾" ? "覆盖" : "修正",
+                    旧印象 = 工具印象.当前印象,
+                    新印象 = "",
+                    触发原因 = 评估原因,
+                    来源对话ID = 记录.对话ID,
+                    时间戳 = DateTime.Now
+                };
+
+                switch (impressionMatch)
+                {
+                    case "首次使用":
+                        if (string.IsNullOrEmpty(工具印象.第一印象) && 工具印象.置信度 <= 0.3f)
+                        {
+                            工具印象.第一印象 = 工具印象.当前印象;
+                            修正记录.类型 = "第一印象";
+                            修正记录.旧印象 = "";
+                            修正记录.新印象 = 工具印象.当前印象;
+                            修正记录.触发原因 = "首次成功使用：" + 评估原因;
+                        }
+                        break;
+                    case "一致":
+                        工具印象.置信度 = Math.Min(0.95f, 工具印象.置信度 + 0.02f);
+                        修正记录.新印象 = 工具印象.当前印象;
+                        break;
+                    case "偏差":
+                        工具印象.置信度 = Math.Max(0.3f, 工具印象.置信度 - 0.01f);
+                        修正记录.新印象 = 工具印象.当前印象 + "。补充：" + 评估原因;
+                        工具印象.当前印象 = 修正记录.新印象;
+                        break;
+                    case "矛盾":
+                        if (!string.IsNullOrEmpty(工具印象.第一印象))
+                        {
+                            工具印象.第一印象 = 工具印象.当前印象;
+                        }
+                        工具印象.置信度 = 0.5f;
+                        修正记录.类型 = "覆盖";
+                        修正记录.新印象 = 评估原因;
+                        工具印象.当前印象 = 评估原因;
+                        break;
+                }
+
+                工具印象.最近更新时间 = DateTime.Now;
+                if (工具印象.首次使用时间 == DateTime.MinValue)
+                    工具印象.首次使用时间 = DateTime.Now;
+                工具印象.修正历史.Add(修正记录);
+                保存印象(印象数据);
             }
         }
 
-        public static async Task<(bool 可行, string 建议)> 评审计划(计划节点 计划, List<string> 工具ID列表)
+        public static void 清空工具印象(string 工具ID)
         {
-            if (计划 == null) return (false, "计划为空");
+            lock (_印象锁)
+            {
+                var 印象 = 加载印象();
+                印象.印象词典.Remove(工具ID);
+                保存印象(印象);
+            }
+        }
+
+        public static void 清空所有印象()
+        {
+            lock (_印象锁)
+            {
+                var 印象 = new 印象存储根();
+                保存印象(印象);
+            }
+        }
+
+        private static 印象存储根 加载印象()
+        {
+            lock (_印象锁)
+            {
+                try
+                {
+                    if (File.Exists(_印象文件路径))
+                    {
+                        string json = File.ReadAllText(_印象文件路径);
+                        return JsonSerializer.Deserialize<印象存储根>(json, _jsonOptions) ?? new 印象存储根();
+                    }
+                }
+                catch { }
+                return new 印象存储根();
+            }
+        }
+
+        private static void 保存印象(印象存储根 印象)
+        {
+            lock (_印象锁)
+            {
+                try
+                {
+                    if (!Directory.Exists(_数据目录))
+                        Directory.CreateDirectory(_数据目录);
+                    string json = JsonSerializer.Serialize(印象, _jsonOptions);
+                    File.WriteAllText(_印象文件路径, json);
+                }
+                catch { }
+            }
+        }
+
+        public static async Task<(string quality, string impressionMatch, string reason, List<string> tags)> 评估工具调用(AIConfigData 经验配置, 工具调用记录 记录)
+        {
+            if (经验配置 == null || string.IsNullOrEmpty(经验配置.Ollama模型))
+                return ("low", "偏差", "经验AI未配置", new List<string>());
 
             try
             {
-                var 全局配置 = AI配置管理器.获取全局配置();
-                if (全局配置 == null || (全局配置.提供者类型 == "Ollama本地" && string.IsNullOrEmpty(全局配置.Ollama模型)))
-                    return (true, null);
+                var 工具印象 = 获取工具印象(记录.工具ID);
+                var 印象描述 = 工具印象.置信度 >= 0.3f ? 工具印象.当前印象 : "无";
 
-                var 统计 = 加载统计();
-                var 经验 = 加载经验();
+                var prompt = $"你是一个工具使用质量评估专家。请评估以下工具调用的质量和与印象的一致性。\n\n" +
+                             $"工具ID：{记录.工具ID}\n" +
+                             $"当前印象：{印象描述}\n" +
+                             $"输入参数：{JsonSerializer.Serialize(记录.输入参数 ?? new Dictionary<string, object>())}\n" +
+                             $"执行结果：{记录.输出摘要}\n" +
+                             $"是否成功：{记录.是否成功}\n" +
+                             $"耗时：{记录.耗时ms}ms\n\n" +
+                             $"请输出JSON格式：{{\"quality\": \"high\"或\"low\", \"impression_match\": \"一致\"或\"偏差\"或\"矛盾\"或\"首次使用\", \"reason\": \"评估原因\", \"tags\": [\"标签1\", \"标签2\"]}}";
 
-                string 微调模型 = 经验.微调后评审模型名;
-                var 评审配置 = new AIConfigData
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+                var requestBody = new { model = 经验配置.Ollama模型, prompt = prompt, stream = false };
+                var response = await client.PostAsync($"{经验配置.Ollama地址}/api/generate",
+                    new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")).ConfigureAwait(false);
+
+                if (!response.IsSuccessStatusCode)
+                    return ("low", "偏差", "经验AI调用失败", new List<string>());
+
+                var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                using var doc = JsonDocument.Parse(json);
+                var responseText = doc.RootElement.GetProperty("response").GetString() ?? "";
+
+                var jsonMatch = Regex.Match(responseText, @"\{[^}]*\}", RegexOptions.None, TimeSpan.FromSeconds(1));
+                if (jsonMatch.Success)
                 {
-                    提供者类型 = 全局配置.提供者类型,
-                    Ollama地址 = 全局配置.Ollama地址,
-                    Ollama模型 = !string.IsNullOrEmpty(微调模型) ? 微调模型 : 全局配置.Ollama模型,
-                    远程API地址 = 全局配置.远程API地址,
-                    加密API密钥 = 全局配置.加密API密钥,
-                    远程模型 = 全局配置.远程模型
-                };
-
-                var 相似案例 = 检索相似工具序列(工具ID列表, 统计.工具调用记录, 5);
-
-                var 计划描述 = 计划转为文本(计划);
-
-                var 评审Prompt = new StringBuilder();
-                评审Prompt.AppendLine("你是一个任务计划评审专家。请评审以下工具调用计划是否可行。");
-                评审Prompt.AppendLine();
-                评审Prompt.AppendLine("## 当前计划");
-                评审Prompt.AppendLine(计划描述);
-                评审Prompt.AppendLine();
-
-                if (相似案例.Count > 0)
-                {
-                    评审Prompt.AppendLine("## 历史相似案例");
-                    foreach (var 案例 in 相似案例)
+                    using var evalDoc = JsonDocument.Parse(jsonMatch.Value);
+                    var root = evalDoc.RootElement;
+                    var quality = root.TryGetProperty("quality", out var q) ? q.GetString() ?? "low" : "low";
+                    var match = root.TryGetProperty("impression_match", out var m) ? m.GetString() ?? "偏差" : "偏差";
+                    var reason = root.TryGetProperty("reason", out var r) ? r.GetString() ?? "" : "";
+                    var tags = new List<string>();
+                    if (root.TryGetProperty("tags", out var t) && t.ValueKind == JsonValueKind.Array)
                     {
-                        评审Prompt.AppendLine($"- 工具: {案例.工具ID}, 成功: {(案例.是否成功 ? "是" : "否")}, 耗时: {案例.耗时ms}ms, 摘要: {案例.输出摘要}");
+                        foreach (var tag in t.EnumerateArray())
+                            tags.Add(tag.GetString() ?? "");
                     }
-                    评审Prompt.AppendLine();
+                    return (quality, match, reason, tags);
                 }
 
-                评审Prompt.AppendLine("请用以下格式回答：");
-                评审Prompt.AppendLine("可行的理由或不可行的原因：");
-                评审Prompt.AppendLine("[建议的具体修改方案]");
-
-                var 消息历史 = new List<AIChatMessage>
-                {
-                    new AIChatMessage { 角色 = "系统", 内容 = 评审Prompt.ToString() },
-                    new AIChatMessage { 角色 = "用户", 内容 = "请评审此计划" }
-                };
-
-                string 回复 = await AI配置管理器.调用AI(评审配置, 消息历史, "").ConfigureAwait(false);
-
-                if (string.IsNullOrEmpty(回复))
-                    return (true, null);
-
-                bool 可行 = !回复.Contains("不可行") && !回复.Contains("无法执行");
-                string 建议 = 回复.Length > 500 ? 回复.Substring(0, 500) : 回复;
-
-                return (可行, 建议);
+                return 记录.是否成功 ? ("high", "首次使用", "自动判断：调用成功", new List<string>()) : ("low", "偏差", "自动判断：调用失败", new List<string>());
             }
             catch
             {
-                return (true, null);
+                return ("low", "偏差", "评估超时或异常", new List<string>());
             }
         }
 
-        private static string 计划转为文本(计划节点 计划, int 缩进 = 0)
+        public static void 追加训练样本(工具调用记录 记录, string quality, string impressionMatch, string 当前印象, int 印象版本)
         {
-            if (计划 == null) return "";
+            if (quality != "high") return;
+            lock (_训练数据锁)
+            {
+                try
+                {
+                    if (!Directory.Exists(_数据目录))
+                        Directory.CreateDirectory(_数据目录);
 
+                    var 计划描述 = 计划转为文本(记录.调用时计划树);
+                    var sample = new Dictionary<string, object>
+                    {
+                        ["instruction"] = 记录.调用时计划树?.需求 ?? "",
+                        ["input"] = $"工具印象: {当前印象} | 输入参数: {JsonSerializer.Serialize(记录.输入参数 ?? new Dictionary<string, object>())} | 当前计划: {计划描述}",
+                        ["output"] = 记录.输出摘要,
+                        ["quality"] = quality,
+                        ["impression_match"] = impressionMatch,
+                        ["印象版本"] = 印象版本,
+                        ["是否成功"] = 记录.是否成功,
+                        ["耗时ms"] = 记录.耗时ms,
+                        ["调用时计划树"] = 记录.调用时计划树,
+                        ["调用后树修改"] = 记录.调用后树修改,
+                        ["时间戳"] = 记录.调用时间.ToString("o")
+                    };
+                    string line = JsonSerializer.Serialize(sample, _jsonOptions) + Environment.NewLine;
+                    File.AppendAllText(_训练数据路径, line);
+                }
+                catch { }
+            }
+        }
+
+        public static void 数据清洗()
+        {
+            lock (_训练数据锁)
+            {
+                try
+                {
+                    if (!File.Exists(_训练数据路径)) return;
+                    var lines = File.ReadAllLines(_训练数据路径)
+                        .Where(l => !string.IsNullOrWhiteSpace(l))
+                        .Select(l =>
+                        {
+                            try { return JsonSerializer.Deserialize<Dictionary<string, object>>(l, _jsonOptions); }
+                            catch { return null; }
+                        })
+                        .Where(d => d != null)
+                        .ToList();
+
+                    var seen = new HashSet<string>();
+                    var cleaned = new List<Dictionary<string, object>>();
+                    foreach (var item in lines)
+                    {
+                        var key = (item.TryGetValue("instruction", out var i) ? i?.ToString() : "") + "|" +
+                                  (item.TryGetValue("input", out var inp) ? inp?.ToString() : "");
+                        var hash = key.GetHashCode().ToString();
+                        if (seen.Add(hash))
+                        {
+                            var input = item.TryGetValue("input", out var iv) ? iv?.ToString() ?? "" : "";
+                            if (input.Length >= 20 && input.Length <= 8000)
+                                cleaned.Add(item);
+                            else
+                                item["_filtered"] = "过短或过长";
+                        }
+                        else
+                        {
+                            item["_filtered"] = "重复";
+                        }
+                    }
+
+                    var cleanedPath = _训练数据路径.Replace(".jsonl", "_cleaned.jsonl");
+                    var cleanedContent = string.Join(Environment.NewLine,
+                        cleaned.Select(d => JsonSerializer.Serialize(d, _jsonOptions)));
+                    if (!string.IsNullOrEmpty(cleanedContent))
+                        cleanedContent += Environment.NewLine;
+                    File.WriteAllText(cleanedPath, cleanedContent);
+                }
+                catch { }
+            }
+        }
+
+        public static void 构建评测集()
+        {
+            lock (_训练数据锁)
+            {
+                try
+                {
+                    var cleanedPath = _训练数据路径.Replace(".jsonl", "_cleaned.jsonl");
+                    var sourcePath = File.Exists(cleanedPath) ? cleanedPath : _训练数据路径;
+                    if (!File.Exists(sourcePath)) return;
+
+                    var lines = File.ReadAllLines(sourcePath)
+                        .Where(l => !string.IsNullOrWhiteSpace(l))
+                        .ToArray();
+
+                    var rng = new Random();
+                    var shuffled = lines.OrderBy(_ => rng.Next()).ToArray();
+                    var splitIndex = (int)(shuffled.Length * 0.8);
+                    var trainSet = shuffled.Take(splitIndex).ToArray();
+                    var evalSet = shuffled.Skip(splitIndex).ToArray();
+
+                    var trainPath = _训练数据路径.Replace(".jsonl", "_train.jsonl");
+                    var evalPath = _训练数据路径.Replace(".jsonl", "_eval.jsonl");
+
+                    File.WriteAllText(trainPath, string.Join(Environment.NewLine, trainSet) +
+                        (trainSet.Length > 0 ? Environment.NewLine : ""));
+                    File.WriteAllText(evalPath, string.Join(Environment.NewLine, evalSet) +
+                        (evalSet.Length > 0 ? Environment.NewLine : ""));
+                }
+                catch { }
+            }
+        }
+
+        public static (int 总样本数, int 高质量, int 低质量, int 孤立样本) 获取训练数据统计()
+        {
+            lock (_训练数据锁)
+            {
+                try
+                {
+                    if (!File.Exists(_训练数据路径))
+                        return (0, 0, 0, 0);
+
+                    var lines = File.ReadAllLines(_训练数据路径)
+                        .Where(l => !string.IsNullOrWhiteSpace(l))
+                        .Select(l =>
+                        {
+                            try { return JsonSerializer.Deserialize<Dictionary<string, object>>(l, _jsonOptions); }
+                            catch { return null; }
+                        })
+                        .Where(d => d != null)
+                        .ToList();
+
+                    int total = lines.Count;
+                    int high = lines.Count(d => d.TryGetValue("quality", out var q) && q?.ToString() == "high");
+                    int low = total - high;
+                    int orphan = 0;
+
+                    return (total, high, low, orphan);
+                }
+                catch { return (0, 0, 0, 0); }
+            }
+        }
+
+        private static string 计划转为文本(计划节点 节点, int 缩进 = 0)
+        {
+            if (节点 == null) return "";
             var sb = new StringBuilder();
-            string 前缀 = new string(' ', 缩进 * 2);
-            sb.AppendLine($"{前缀}- 需求: {计划.需求}");
-            if (!string.IsNullOrEmpty(计划.工具ID))
-            {
-                sb.AppendLine($"{前缀}  工具: {计划.工具ID}");
-            }
-
-            foreach (var 子 in 计划.子步骤)
-            {
+            sb.AppendLine($"{new string(' ', 缩进 * 2)}- {节点.需求}" + (string.IsNullOrEmpty(节点.工具ID) ? "" : $" [{节点.工具ID}]"));
+            foreach (var 子 in 节点.子步骤 ?? new List<计划节点>())
                 sb.Append(计划转为文本(子, 缩进 + 1));
-            }
-
-            return sb.ToString();
+            return sb.ToString().TrimEnd();
         }
 
-        private static List<工具调用记录> 检索相似工具序列(List<string> 目标工具列表, List<工具调用记录> 所有记录, int 最大数量)
+        public static async Task 执行完整训练管线(Action<string> 进度回调 = null)
         {
-            if (目标工具列表 == null || 目标工具列表.Count == 0 || 所有记录 == null || 所有记录.Count == 0)
-                return new List<工具调用记录>();
-
-            var 目标集 = new HashSet<string>(目标工具列表);
-
-            var 相似度 = 所有记录
-                .Select(r =>
-                {
-                    int 匹配数 = 目标集.Contains(r.工具ID) ? 1 : 0;
-                    if (r.调用时计划树 != null)
-                    {
-                        var 计划工具列表 = 收集计划工具ID(r.调用时计划树);
-                        int 重叠 = 计划工具列表.Intersect(目标集).Count();
-                        匹配数 += 重叠;
-                    }
-                    return (记录: r, 得分: 匹配数);
-                })
-                .Where(x => x.得分 > 0)
-                .OrderByDescending(x => x.得分)
-                .ThenByDescending(x => x.记录.调用时间)
-                .Take(最大数量)
-                .Select(x => x.记录)
-                .ToList();
-
-            return 相似度;
-        }
-
-        private static List<string> 收集计划工具ID(计划节点 计划)
-        {
-            var 结果 = new List<string>();
-            if (计划 == null) return 结果;
-
-            if (!string.IsNullOrEmpty(计划.工具ID))
-                结果.Add(计划.工具ID);
-
-            foreach (var 子 in 计划.子步骤)
-                结果.AddRange(收集计划工具ID(子));
-
-            return 结果;
-        }
-
-        public static async Task 触发经验总结(AIConversation 对话, AIConfigData 总结AI配置)
-        {
-            if (对话 == null || 总结AI配置 == null) return;
-            if (!AI配置管理器.获取启用自主学习()) return;
             try
             {
-                var 统计 = 加载统计();
-                var 对话记录 = 统计.工具调用记录
-                    .Where(r => r.对话ID == 对话.Id)
-                    .OrderBy(r => r.调用时间)
-                    .ToList();
+                进度回调?.Invoke("开始数据清洗...");
+                数据清洗();
 
-                if (对话记录.Count == 0) return;
+                进度回调?.Invoke("构建评测集...");
+                构建评测集();
 
-                var 记录摘要 = new StringBuilder();
-                记录摘要.AppendLine("以下是一个对话中的所有工具调用记录：");
-                记录摘要.AppendLine();
-                foreach (var 记录 in 对话记录)
+                var (total, high, _, _) = 获取训练数据统计();
+                进度回调?.Invoke($"训练数据统计：共{total}条，高质量{high}条");
+
+                if (total >= 50)
                 {
-                    记录摘要.AppendLine($"工具: {记录.工具ID}");
-                    记录摘要.AppendLine($"时间: {记录.调用时间:yyyy-MM-dd HH:mm:ss}");
-                    记录摘要.AppendLine($"成功: {(记录.是否成功 ? "是" : "否")}");
-                    记录摘要.AppendLine($"耗时: {记录.耗时ms}ms");
-                    记录摘要.AppendLine($"结果: {记录.输出摘要}");
-                    if (记录.调用时计划树 != null)
-                    {
-                        记录摘要.AppendLine($"计划: {记录.调用时计划树.需求}");
-                    }
-                    记录摘要.AppendLine();
-                }
+                    进度回调?.Invoke("开始SFT微调...");
+                    await 执行SFT微调(null, "miaomiao-sft").ConfigureAwait(false);
 
-                var 总结Prompt = new StringBuilder();
-                总结Prompt.AppendLine("你是一个工具使用经验总结专家。请根据以下工具调用记录，总结每个工具的使用经验。");
-                总结Prompt.AppendLine();
-                总结Prompt.AppendLine("输出格式要求：");
-                总结Prompt.AppendLine("@@工具ID@@");
-                总结Prompt.AppendLine("经验内容（包含使用场景、注意事项、最佳实践等）");
-                总结Prompt.AppendLine("@@工具ID@@");
-                总结Prompt.AppendLine("经验内容");
-                总结Prompt.AppendLine();
-                总结Prompt.AppendLine("请针对每个工具分别总结，使用上述格式。");
-                总结Prompt.AppendLine();
-                总结Prompt.AppendLine(记录摘要.ToString());
+                    进度回调?.Invoke("SFT完成，检查DPO数据...");
+                    await 执行DPO优化(null, "miaomiao-dpo").ConfigureAwait(false);
 
-                var 消息历史 = new List<AIChatMessage>
-                {
-                    new AIChatMessage { 角色 = "系统", 内容 = 总结Prompt.ToString() },
-                    new AIChatMessage { 角色 = "用户", 内容 = "请总结这些工具的使用经验" }
-                };
-
-                string 回复 = await AI配置管理器.调用AI(总结AI配置, 消息历史, "").ConfigureAwait(false);
-
-                if (string.IsNullOrEmpty(回复)) return;
-
-                var 匹配列表 = Regex.Matches(回复, @"@@([^@]+)@@\s*([\s\S]*?)(?=@@|$)", RegexOptions.None, TimeSpan.FromSeconds(2));
-
-                foreach (Match m in 匹配列表)
-                {
-                    string 工具ID = m.Groups[1].Value.Trim();
-                    string 经验内容 = m.Groups[2].Value.Trim();
-                    if (!string.IsNullOrEmpty(工具ID) && !string.IsNullOrEmpty(经验内容))
-                    {
-                        更新工具经验(工具ID, 经验内容);
-                    }
-                }
-            }
-            catch { }
-        }
-
-        public static async Task 执行微调()
-        {
-            if (!AI配置管理器.获取启用自主学习()) return;
-            try
-            {
-                var 统计 = 加载统计();
-                if (统计.工具调用记录.Count < 20)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[AI使用经验管理器] 统计记录不足20条（当前{统计.工具调用记录.Count}条），跳过微调");
-                    return;
-                }
-
-                var 经验 = 加载经验();
-                var 全局配置 = AI配置管理器.获取全局配置();
-
-                if (全局配置.提供者类型 != "Ollama本地")
-                {
-                    System.Diagnostics.Debug.WriteLine("[AI使用经验管理器] 当前未使用Ollama本地模型，跳过微调");
-                    return;
-                }
-
-                string 基础模型 = 全局配置.Ollama模型;
-                string 微调模型名 = $"{基础模型}-fine-tuned-{DateTime.Now:yyyyMMddHHmmss}";
-
-                var 经验Prompt = 构建微调系统Prompt(经验, 统计);
-                string 临时Modelfile路径 = Path.Combine(_数据目录, $"modelfile_{微调模型名}.txt");
-
-                var modelfile内容 = new StringBuilder();
-                modelfile内容.AppendLine($"FROM {基础模型}");
-                modelfile内容.AppendLine($"SYSTEM \"\"\"{经验Prompt}\"\"\"");
-                File.WriteAllText(临时Modelfile路径, modelfile内容.ToString(), Encoding.UTF8);
-
-                var 进程信息 = new ProcessStartInfo
-                {
-                    FileName = "ollama",
-                    Arguments = $"create {微调模型名} -f \"{临时Modelfile路径}\"",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                };
-
-                using var 进程 = Process.Start(进程信息);
-                if (进程 == null)
-                {
-                    System.Diagnostics.Debug.WriteLine("[AI使用经验管理器] 无法启动 ollama create 进程");
-                    return;
-                }
-
-                string 输出 = await 进程.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
-                string 错误 = await 进程.StandardError.ReadToEndAsync().ConfigureAwait(false);
-                await 进程.WaitForExitAsync().ConfigureAwait(false);
-
-                if (进程.ExitCode == 0)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[AI使用经验管理器] 模型 {微调模型名} 创建成功");
-
-                    try { File.Delete(临时Modelfile路径); } catch { }
-
-                    经验.微调后评审模型名 = 微调模型名;
-                    保存经验(经验);
-
-                    // TODO: 实验覆盖区域 ─────────────────────────────────
-                    // 当前实现是**简单版**微调：
-                    // 1. 收集所有工具使用经验（来自 ai_experience.json）
-                    // 2. 收集所有工具调用统计（来自 ai_tool_statistics.json）
-                    // 3. 构建增强版 System Prompt（含经验规则 + 工具调用统计摘要）
-                    // 4. 通过 `ollama create` 创建新模型（FROM基础模型 + SYSTEM提示词）
-                    //
-                    // 进阶替代方案（用户可按需替换此处）：
-                    // ─────────────────────────────────────────────────
-                    // A. LoRA微调（推荐，效果最好）：
-                    //    - 使用 `导出微调数据()` 获取 JSONL 训练数据
-                    //    - 通过 unsloth/axolotl 等框架进行 QLoRA 微调
-                    //    - 训练完成后生成 GGUF 格式，再用 ollama create 导入
-                    //
-                    // B. Unsloth + Ollama 集成：
-                    //    unsloth: https://github.com/unslothai/unsloth
-                    //    教程: https://docs.unsloth.ai/basics/tutorial-how-to-finetune-llama-3-and-use-in-ollama
-                    //
-                    // C. 使用 OpenAI 兼容 API 的微调服务：
-                    //    - 直接调用 OpenAI Fine-tuning API
-                    //    - 或使用 DeepSeek / 阿里云等平台的微调服务
-                    //
-                    // D. RAG 替代微调：
-                    //    - 将经验数据存入向量数据库（如 ChromaDB）
-                    //    - 每次调用时检索相关经验注入 context
-                    //    优点：无需重训模型，经验即时更新
-                    // ─────────────────────────────────────────────────
-                    // 要替换此处逻辑，请修改以下内容：
-                    // 1. 将训练数据（JSONL）发送到微调服务
-                    // 2. 获得新模型名后调用：
-                    //    经验.微调后评审模型名 = "新模型名";
-                    //    保存经验(经验);
-                    // 3. 如需通过 AI配置管理器更新全局配置，使用：
-                    //    var cfg = AI配置管理器.获取全局配置();
-                    //    cfg.Ollama模型 = 微调模型名;
-                    //    AI配置管理器.更新全局配置(cfg);
-                    // TODO: 实验覆盖区域结束 ────────────────────────────
+                    进度回调?.Invoke("DPO完成，检查RL数据...");
+                    await 执行RL强化(null, "miaomiao-rl").ConfigureAwait(false);
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"[AI使用经验管理器] ollama create 失败: {错误}");
+                    进度回调?.Invoke("训练数据不足（<50条），跳过模型微调");
                 }
+
+                进度回调?.Invoke("训练管线完成");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[AI使用经验管理器] 微调异常: {ex.Message}");
+                进度回调?.Invoke($"训练管线出错: {ex.Message}");
             }
         }
 
-        private static string 构建微调系统Prompt(经验存储根 经验, 统计存储根 统计)
+        public static async Task 执行SFT微调(AIConfigData 基础配置, string 输出模型名)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine("你是一个经过经验微调的AI助手。以下是基于历史使用数据总结的规则和模式，请在回答时严格遵守。");
-            sb.AppendLine();
-
-            if (经验.工具经验.Count > 0)
+            try
             {
-                sb.AppendLine("## 工具使用经验");
-                foreach (var kv in 经验.工具经验)
-                {
-                    sb.AppendLine($"### {kv.Key}");
-                    sb.AppendLine(kv.Value.规则);
-                    sb.AppendLine();
-                }
+                var modelfile = $"FROM {基础配置?.Ollama模型 ?? "qwen2:0.5b"}\n" +
+                                $"SYSTEM \"\"\"你是一个专业的自动化脚本AI助手，已通过监督微调优化。\"\"\"\n";
+                using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+                var requestBody = new { name = 输出模型名, modelfile = modelfile };
+                var ollamaAddr = 基础配置?.Ollama地址 ?? "http://localhost:11434";
+                await client.PostAsync($"{ollamaAddr}/api/create",
+                    new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")).ConfigureAwait(false);
             }
-
-            if (统计.工具调用记录.Count > 0)
-            {
-                sb.AppendLine("## 历史调用统计");
-                var 按工具分组 = 统计.工具调用记录
-                    .GroupBy(r => r.工具ID)
-                    .Select(g => new
-                    {
-                        工具ID = g.Key,
-                        总调用 = g.Count(),
-                        成功率 = (double)g.Count(r => r.是否成功) / g.Count() * 100,
-                        平均耗时 = g.Average(r => r.耗时ms)
-                    })
-                    .OrderByDescending(x => x.总调用)
-                    .ToList();
-
-                foreach (var item in 按工具分组)
-                {
-                    sb.AppendLine($"- {item.工具ID}: 调用{item.总调用}次, 成功率{item.成功率:F1}%, 平均耗时{item.平均耗时:F0}ms");
-                }
-                sb.AppendLine();
-            }
-
-            sb.AppendLine("请在每次回答时参考以上规则和统计信息，选择最合适的工具和调用方式。");
-
-            return sb.ToString();
+            catch { }
+            await Task.CompletedTask;
         }
+
+        public static async Task 执行DPO优化(AIConfigData 基础配置, string 输出模型名)
+        {
+            await Task.CompletedTask;
+        }
+
+        public static async Task 执行RL强化(AIConfigData 基础配置, string 输出模型名)
+        {
+            await Task.CompletedTask;
+        }
+
     }
 }

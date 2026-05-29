@@ -57,7 +57,7 @@ namespace 淼喵妙神奇工具库
                 {
                     名称 = "询问视觉AI",
                     工具ID = "ask_vision_ai",
-                    描述 = "截取当前屏幕并调用视觉AI进行分析，将视觉AI的回复直接返回。你可以传入任意自定义分析Prompt，灵活控制视觉AI的分析内容。参数: 提示词(必填,传给视觉AI的分析Prompt,例如'屏幕上有哪些按钮?' '登录按钮在什么位置?返回JSON坐标'等)",
+                    描述 = "截取当前屏幕并调用视觉AI分析，将视觉AI回复直接返回。参数: 提示词(必填,传给视觉AI的分析Prompt)",
                     脚本路径 = "",
                     参数Schema = new Dictionary<string, object>
                     {
@@ -77,7 +77,7 @@ namespace 淼喵妙神奇工具库
                 {
                     名称 = "修改脚本备注",
                     工具ID = "modify_script_remark",
-                    描述 = "修改当前MCP工具组中某个脚本文件的备注内容。只能修改已加载为MCP工具的脚本。当发现脚本备注缺失、描述不准确、或与其他脚本无法区分时，在征得用户同意后使用此工具更新备注，帮助后续AI准确识别脚本功能。参数: 脚本名或路径(必填,脚本文件名不含扩展名或完整路径), 新备注(必填,新的备注内容)",
+                    描述 = "修改当前MCP工具组中某个脚本的备注。参数: 脚本名或路径(必填), 新备注(必填)",
                     脚本路径 = "",
                     参数Schema = new Dictionary<string, object>
                     {
@@ -102,7 +102,7 @@ namespace 淼喵妙神奇工具库
                 {
                     名称 = "写日志",
                     工具ID = "write_log",
-                    描述 = "将日志内容写入应用目录下的logs文件夹。参数: 日志名(必填,日志文件名), 内容(必填,要写入的日志内容)",
+                    描述 = "将日志写入应用logs目录。参数: 日志名(必填), 内容(必填)",
                     脚本路径 = "",
                     参数Schema = new Dictionary<string, object>
                     {
@@ -127,7 +127,7 @@ namespace 淼喵妙神奇工具库
                 {
                     名称 = "读日志",
                     工具ID = "read_log",
-                    描述 = "读取应用目录下logs文件夹中的日志文件。参数: 日志名(必填,要读取的日志文件名)",
+                    描述 = "读取应用logs目录中的日志文件,超8000字符自动截断。参数: 日志名(必填)",
                     脚本路径 = "",
                     参数Schema = new Dictionary<string, object>
                     {
@@ -147,7 +147,7 @@ namespace 淼喵妙神奇工具库
                 {
                     名称 = "等待时间",
                     工具ID = "wait_until_time",
-                    描述 = "设置一个绝对时间点进行等待，不阻塞对话。时间到达后系统会自动通知AI继续执行任务。参数: 绝对时间(必填,格式 yyyy-MM-dd HH:mm:ss)",
+                    描述 = "设置绝对时间点等待,时间到自动通知。参数: 绝对时间(必填,格式yyyy-MM-dd HH:mm:ss)",
                     脚本路径 = "",
                     参数Schema = new Dictionary<string, object>
                     {
@@ -167,7 +167,7 @@ namespace 淼喵妙神奇工具库
                 {
                     名称 = "等待事件",
                     工具ID = "wait_for_event",
-                    描述 = "监听指定名称的触发任务（TriggerTask），事件触发后系统自动通知AI继续。参数: 事件名称(必填,触发任务的名称), 超时分钟(可选,默认30)",
+                    描述 = "监听触发任务,事件触发后自动通知。参数: 事件名称(必填), 超时分钟(可选,默认30)",
                     脚本路径 = "",
                     参数Schema = new Dictionary<string, object>
                     {
@@ -192,7 +192,7 @@ namespace 淼喵妙神奇工具库
                 {
                     名称 = "联网搜索",
                     工具ID = "web_search",
-                    描述 = "通过搜索引擎搜索互联网上的实时信息。当需要获取最新资讯、事实核查、或用户明确要求搜索时使用。参数: 查询关键词(必填,搜索关键词), 最大结果数(可选,默认5,范围1-10)",
+                    描述 = "联网搜索实时信息。参数: 查询关键词(必填), 最大结果数(可选,默认5,范围1-10)",
                     脚本路径 = "",
                     参数Schema = new Dictionary<string, object>
                     {
@@ -217,7 +217,7 @@ namespace 淼喵妙神奇工具库
                 {
                     名称 = "展开查看脚本",
                     工具ID = "expand_script",
-                    描述 = "展开查看一个已保存脚本的完整内部结构——所有节点及其字段数据。可查看所有已保存脚本（不限当前对话加载的工具范围）。当需要了解某个脚本的内部实现（用了哪些节点、每个节点的参数）时使用。参数: 脚本标识(必填,脚本文件名不含扩展名)。注意：图片/二进制数据会自动省略。",
+                    描述 = "展开查看已保存脚本的完整内部结构（节点及参数）。参数: 脚本标识(必填,文件名不含扩展名)",
                     脚本路径 = "",
                     参数Schema = new Dictionary<string, object>
                     {
@@ -237,7 +237,7 @@ namespace 淼喵妙神奇工具库
                 {
                     名称 = "搜索脚本",
                     工具ID = "search_scripts",
-                    描述 = "在所有已保存脚本中按关键词搜索。先在名称和备注中搜索，也可指定搜索完整文件内容。可查看所有已保存脚本（不限当前对话加载的工具范围）。当不知道具体脚本名、想找某类功能的参考脚本时使用。参数: 关键词(必填), 搜索范围(可选,'名称备注'默认/'完整内容'), 最大结果数(可选,默认5)",
+                    描述 = "按关键词搜索已保存脚本。参数: 关键词(必填), 搜索范围(可选,'名称备注'/'完整内容'), 最大结果数(可选,默认5)",
                     脚本路径 = "",
                     参数Schema = new Dictionary<string, object>
                     {
@@ -263,23 +263,23 @@ namespace 淼喵妙神奇工具库
                         ["required"] = new List<string> { "关键词" }
                     }
                 },
-                new MCPToolDefinition { 名称 = "列出节点类型", 工具ID = "list_node_types", 描述 = "列出所有可用的节点类型及其关键字段，用于add_node时选择正确的节点类型", 脚本路径 = "" },
-                new MCPToolDefinition { 名称 = "节点创建规则", 工具ID = "get_node_creation_rules", 描述 = "获取节点创建的规则表，包括鼠标操作优先级、等待策略、循环构建方式等", 脚本路径 = "" },
-                new MCPToolDefinition { 名称 = "创建工作脚本", 工具ID = "create_working_script", 描述 = "初始化一个工作脚本，设置进程名和窗口标题。参数: 进程名(必填,如'notepad.exe'), 窗口标题(必填,目标窗口标题)", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["进程名"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "目标进程名，如'notepad.exe'或'chrome.exe'" }, ["窗口标题"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "目标窗口标题，支持部分匹配" } }, ["required"] = new List<string> { "进程名", "窗口标题" } } },
-                new MCPToolDefinition { 名称 = "添加节点", 工具ID = "add_node", 描述 = "向工作脚本追加一个节点。参数: 节点类型(必填,如'点击图片'), 节点名字(可选), 节点备注(可选), 成功后等待(可选,毫秒), 失败后等待(可选,毫秒), 以及其他节点特有字段", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["节点类型"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "节点类名，如'点击图片'、'输入文本'、'打开应用'等" }, ["节点名字"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "节点的显示名称" }, ["节点备注"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "节点的备注说明" }, ["成功后等待"] = new Dictionary<string, object> { ["type"] = "integer", ["description"] = "成功执行后的等待时间（毫秒）" }, ["失败后等待"] = new Dictionary<string, object> { ["type"] = "integer", ["description"] = "失败后的等待时间（毫秒）" } }, ["required"] = new List<string> { "节点类型" } } },
-                new MCPToolDefinition { 名称 = "移除节点", 工具ID = "remove_node", 描述 = "从工作脚本中移除指定索引的节点，自动修正其他节点的跳转引用。参数: 索引(必填,节点在列表中的位置,从0开始)", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["索引"] = new Dictionary<string, object> { ["type"] = "integer", ["description"] = "节点在列表中的位置，从0开始" } }, ["required"] = new List<string> { "索引" } } },
-                new MCPToolDefinition { 名称 = "修改节点", 工具ID = "modify_node", 描述 = "修改工作脚本中指定节点的字段值。参数: 索引(必填), 参数字典(必填,JSON对象,键为字段名,值为新值)。可修改基类字段: 节点名字、节点备注、成功后等待、失败后等待", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["索引"] = new Dictionary<string, object> { ["type"] = "integer", ["description"] = "节点索引" }, ["参数字典"] = new Dictionary<string, object> { ["type"] = "object", ["description"] = "要修改的字段，如{\"节点名字\":\"新名字\",\"成功后等待\":500}" } }, ["required"] = new List<string> { "索引", "参数字典" } } },
-                new MCPToolDefinition { 名称 = "执行节点", 工具ID = "execute_node", 描述 = "单独执行工作脚本中指定索引的节点，用于测试节点是否正确。参数: 索引(必填), 窗口句柄(可选,默认IntPtr.Zero)。返回执行结果（成功/失败）", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["索引"] = new Dictionary<string, object> { ["type"] = "integer", ["description"] = "要执行的节点索引" } }, ["required"] = new List<string> { "索引" } } },
-                new MCPToolDefinition { 名称 = "保存脚本", 工具ID = "save_script", 描述 = "将当前工作脚本序列化保存为.script文件并注册到脚本分类中。参数: 脚本名(必填), 备注(可选), 分类名(可选,默认'未分类')", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["脚本名"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "脚本文件名（不含扩展名）" }, ["备注"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "脚本备注说明" }, ["分类名"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "脚本所属分类，默认'未分类'" } }, ["required"] = new List<string> { "脚本名" } } },
-                new MCPToolDefinition { 名称 = "列出所有脚本", 工具ID = "list_all_scripts", 描述 = "列出系统中所有已保存的脚本文件及其分类信息", 脚本路径 = "" },
-                new MCPToolDefinition { 名称 = "分类脚本", 工具ID = "classify_script", 描述 = "将指定脚本移动到目标分类。参数: 脚本名或路径(必填), 目标分类(必填)", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["脚本名或路径"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "脚本文件名或完整路径" }, ["目标分类"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "目标分类名称，如'日常签到'" } }, ["required"] = new List<string> { "脚本名或路径", "目标分类" } } },
-                new MCPToolDefinition { 名称 = "编辑分类规则", 工具ID = "edit_category_rule", 描述 = "编辑指定分类的AI规则。参数: 分类名(必填), AI规则(必填,新规则内容)", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["分类名"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "要编辑规则的分类名称" }, ["AI规则"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "新的AI规则内容" } }, ["required"] = new List<string> { "分类名", "AI规则" } } },
-                new MCPToolDefinition { 名称 = "创建分类", 工具ID = "create_category", 描述 = "创建新的脚本分类。参数: 分类名(必填), 父分类(可选,默认创建在根目录)", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["分类名"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "新分类的名称" }, ["父分类"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "父分类名称，不填则创建在根目录" } }, ["required"] = new List<string> { "分类名" } } },
+                new MCPToolDefinition { 名称 = "列出节点类型", 工具ID = "list_node_types", 描述 = "列出所有可用节点类型及关键字段", 脚本路径 = "" },
+                new MCPToolDefinition { 名称 = "节点创建规则", 工具ID = "get_node_creation_rules", 描述 = "获取节点创建规则表", 脚本路径 = "" },
+                new MCPToolDefinition { 名称 = "创建工作脚本", 工具ID = "create_working_script", 描述 = "初始化工作脚本。参数: 进程名(必填), 窗口标题(必填)", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["进程名"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "目标进程名" }, ["窗口标题"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "目标窗口标题" } }, ["required"] = new List<string> { "进程名", "窗口标题" } } },
+                new MCPToolDefinition { 名称 = "添加节点", 工具ID = "add_node", 描述 = "向工作脚本追加节点。参数: 节点类型(必填), 其他字段按需传入", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["节点类型"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "节点类名" }, ["节点名字"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "显示名称" }, ["节点备注"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "备注" }, ["成功后等待"] = new Dictionary<string, object> { ["type"] = "integer", ["description"] = "成功后等待(ms)" }, ["失败后等待"] = new Dictionary<string, object> { ["type"] = "integer", ["description"] = "失败后等待(ms)" } }, ["required"] = new List<string> { "节点类型" } } },
+                new MCPToolDefinition { 名称 = "移除节点", 工具ID = "remove_node", 描述 = "移除指定索引节点并修正跳转引用。参数: 索引(必填,从0开始)", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["索引"] = new Dictionary<string, object> { ["type"] = "integer", ["description"] = "节点位置，从0开始" } }, ["required"] = new List<string> { "索引" } } },
+                new MCPToolDefinition { 名称 = "修改节点", 工具ID = "modify_node", 描述 = "修改节点字段值。参数: 索引(必填), 参数字典(必填,JSON对象)", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["索引"] = new Dictionary<string, object> { ["type"] = "integer", ["description"] = "节点索引" }, ["参数字典"] = new Dictionary<string, object> { ["type"] = "object", ["description"] = "修改的字段键值对" } }, ["required"] = new List<string> { "索引", "参数字典" } } },
+                new MCPToolDefinition { 名称 = "执行节点", 工具ID = "execute_node", 描述 = "单独执行指定节点用于测试。参数: 索引(必填)", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["索引"] = new Dictionary<string, object> { ["type"] = "integer", ["description"] = "节点索引" } }, ["required"] = new List<string> { "索引" } } },
+                new MCPToolDefinition { 名称 = "保存脚本", 工具ID = "save_script", 描述 = "保存工作脚本为.script文件。参数: 脚本名(必填), 备注(可选), 分类名(可选,默认'未分类')", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["脚本名"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "文件名（不含扩展名）" }, ["备注"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "脚本备注" }, ["分类名"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "所属分类" } }, ["required"] = new List<string> { "脚本名" } } },
+                new MCPToolDefinition { 名称 = "列出所有脚本", 工具ID = "list_all_scripts", 描述 = "列出所有已保存脚本及分类信息", 脚本路径 = "" },
+                new MCPToolDefinition { 名称 = "分类脚本", 工具ID = "classify_script", 描述 = "将脚本移到目标分类。参数: 脚本名或路径(必填), 目标分类(必填)", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["脚本名或路径"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "脚本名或完整路径" }, ["目标分类"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "目标分类名" } }, ["required"] = new List<string> { "脚本名或路径", "目标分类" } } },
+                new MCPToolDefinition { 名称 = "编辑分类规则", 工具ID = "edit_category_rule", 描述 = "编辑分类的AI规则。参数: 分类名(必填), AI规则(必填)", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["分类名"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "分类名" }, ["AI规则"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "新规则内容" } }, ["required"] = new List<string> { "分类名", "AI规则" } } },
+                new MCPToolDefinition { 名称 = "创建分类", 工具ID = "create_category", 描述 = "创建新脚本分类。参数: 分类名(必填), 父分类(可选)", 脚本路径 = "", 参数Schema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = new Dictionary<string, object> { ["分类名"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "分类名" }, ["父分类"] = new Dictionary<string, object> { ["type"] = "string", ["description"] = "父分类名" } }, ["required"] = new List<string> { "分类名" } } },
                 new MCPToolDefinition
                 {
                     名称 = "查找窗口",
                     工具ID = "find_window",
-                    描述 = "根据窗口标题（部分匹配）查找可见窗口，返回窗口的屏幕矩形坐标和大小。参数: 窗口标题(必填,部分匹配即可)",
+                    描述 = "根据窗口标题查找窗口坐标。参数: 窗口标题(必填,部分匹配)",
                     脚本路径 = "",
                     参数Schema = new Dictionary<string, object>
                     {
@@ -289,7 +289,7 @@ namespace 淼喵妙神奇工具库
                             ["窗口标题"] = new Dictionary<string, object>
                             {
                                 ["type"] = "string",
-                                ["description"] = "目标窗口标题，支持部分匹配，如'记事本'、'Chrome'"
+                                ["description"] = "目标窗口标题，部分匹配"
                             }
                         },
                         ["required"] = new List<string> { "窗口标题" }
@@ -299,7 +299,7 @@ namespace 淼喵妙神奇工具库
                 {
                     名称 = "等待AI回复",
                     工具ID = "wait_for_ai_reply",
-                    描述 = "等待另一个对话中的AI完成输出，返回最后一条AI消息内容。用于对话间协同，例如一个对话生成了脚本后另一个对话等待结果并继续处理。参数: 对话名(必填,目标对话的名称), 超时分钟(可选,默认30)",
+                    描述 = "等待另一个对话的AI完成输出并返回最后消息。参数: 对话名(必填), 超时分钟(可选,默认30)",
                     脚本路径 = "",
                     参数Schema = new Dictionary<string, object>
                     {
@@ -1152,94 +1152,20 @@ namespace 淼喵妙神奇工具库
             sb.AppendLine("节点创建规则表");
             sb.AppendLine("================");
             sb.AppendLine();
-            sb.AppendLine("## 一、鼠标操作节点（选型优先级由高到低）");
+            sb.AppendLine("一、鼠标操作优先级(高→低): 点击图片(阈值0.85)→点击串联图片→点击文字→鼠标单击→双击→拖拽→滚轮→悬停→长按");
+            sb.AppendLine("  等待建议: 点击类300-500ms, 拖拽/悬停500-1000ms, 滚轮200-500ms, 长按300-500ms");
             sb.AppendLine();
-            sb.AppendLine("1. 点击图片 — 最优先，适用于有目标按钮/图标的截图场景");
-            sb.AppendLine("   - 适用: 目标界面元素有固定视觉特征，窗口位置可能变化");
-            sb.AppendLine("   - 识别阈值建议: 0.85（可在0.7-0.95之间调整）");
-            sb.AppendLine("   - 成功后等待建议: 300-500ms");
-            sb.AppendLine("   - 注意: 需要先截取目标图片作为模板");
+            sb.AppendLine("二、键盘: 输入文本/单击按键等待100-300ms, 快捷键等待200-500ms");
             sb.AppendLine();
-            sb.AppendLine("2. 点击串联图片 — 目标在特定锚点图片附近时使用");
-            sb.AppendLine("   - 适用: 目标位置相对于某个固定图标/按钮固定");
-            sb.AppendLine("   - 成功后等待建议: 300-500ms");
-            sb.AppendLine("   - 注意: 需要主图和附加锚点图");
+            sb.AppendLine("三、应用窗口: 打开应用等待1-3s, 绑定窗口等待500-1000ms, 调整窗口等待300-500ms");
             sb.AppendLine();
-            sb.AppendLine("3. 点击文字 — 目标有明确文字标签");
-            sb.AppendLine("   - 适用: 按钮/链接上有清晰的文字");
-            sb.AppendLine("   - 成功后等待建议: 300-500ms");
-            sb.AppendLine("   - 注意: 依赖OCR识别，文字需清晰可见");
+            sb.AppendLine("四、等待策略: 操作类100-500ms, 加载类500-2000ms, 识别类100-300ms, 失败等待默认等于成功等待, 不单设等待节点");
             sb.AppendLine();
-            sb.AppendLine("4. 鼠标单击 — 固定坐标点击（灵活性最低，仅作降级方案）");
-            sb.AppendLine("   - 适用: 已知固定坐标，或以上方法都不可用时");
-            sb.AppendLine("   - 成功后等待建议: 300-500ms");
-            sb.AppendLine("   - 注意: 窗口位置变化会导致点击失败");
+            sb.AppendLine("五、循环构建: 成功后跳转→循环首节点, 失败后跳转→退出节点, 备注标注「循环开始」「循环结束」");
             sb.AppendLine();
-            sb.AppendLine("5. 鼠标双击 — 需要双击的场景");
-            sb.AppendLine("   - 成功后等待建议: 300-500ms");
-            sb.AppendLine("6. 鼠标拖拽 — 拖拽操作（拖动文件、滑动条等）");
-            sb.AppendLine("   - 成功后等待建议: 500-1000ms");
-            sb.AppendLine("7. 鼠标滚轮 — 滚动页面");
-            sb.AppendLine("   - 成功后等待建议: 200-500ms");
-            sb.AppendLine("8. 鼠标悬停 — 鼠标悬停触发菜单/提示");
-            sb.AppendLine("   - 成功后等待建议: 500-1000ms（等待菜单出现）");
-            sb.AppendLine("9. 鼠标长按 — 长按操作");
-            sb.AppendLine("   - 成功后等待建议: 300-500ms");
+            sb.AppendLine("六、流程控制节点: 空节点/停止任务/显示变量/提示弹窗/计算函数/执行任务/插队/PowerShell指令/远程指令/HTTP请求/CSharp脚本");
             sb.AppendLine();
-            sb.AppendLine("## 二、键盘输入节点");
-            sb.AppendLine();
-            sb.AppendLine("1. 输入文本 — 输入字符串");
-            sb.AppendLine("   - 适用: 在输入框中输入文本");
-            sb.AppendLine("   - 成功后等待建议: 100-300ms");
-            sb.AppendLine("2. 单击按键 — 按单个键（Enter、Tab、Esc等）");
-            sb.AppendLine("   - 成功后等待建议: 100-300ms");
-            sb.AppendLine("3. 快捷键 — 组合键（Ctrl+C、Alt+Tab等）");
-            sb.AppendLine("   - 成功后等待建议: 200-500ms");
-            sb.AppendLine("4. 长按按键 — 长按某个键");
-            sb.AppendLine("   - 成功后等待建议: 100-300ms");
-            sb.AppendLine();
-            sb.AppendLine("## 三、应用与窗口节点");
-            sb.AppendLine();
-            sb.AppendLine("1. 打开应用 — 启动应用程序");
-            sb.AppendLine("   - 成功后等待建议: 1000-3000ms（等待应用启动）");
-            sb.AppendLine("2. 绑定运行应用 — 绑定到已运行的应用窗口");
-            sb.AppendLine("   - 成功后等待建议: 500-1000ms");
-            sb.AppendLine("3. 调整窗口尺寸 — 调整窗口大小和位置");
-            sb.AppendLine("   - 成功后等待建议: 300-500ms");
-            sb.AppendLine();
-            sb.AppendLine("## 四、等待策略");
-            sb.AppendLine();
-            sb.AppendLine("- 操作类节点（点击、输入、按键）: 成功后等待 100-500ms");
-            sb.AppendLine("- 触发加载类节点（打开应用、点击后跳页）: 成功后等待 500-2000ms");
-            sb.AppendLine("- 识别类节点（截图、OCR）: 成功后等待 100-300ms");
-            sb.AppendLine("- 失败后等待默认与成功后等待相同");
-            sb.AppendLine("- 不单独设等待节点，等待时间通过节点的「成功后等待」和「失败后等待」字段控制");
-            sb.AppendLine();
-            sb.AppendLine("## 五、循环构建");
-            sb.AppendLine();
-            sb.AppendLine("- 通过「成功后跳转」指向循环首节点实现循环");
-            sb.AppendLine("- 通过「失败后跳转」指向退出节点（停止任务或下一个非循环节点）");
-            sb.AppendLine("- 循环首节点备注标注「循环开始」，末节点备注标注「循环结束」");
-            sb.AppendLine();
-            sb.AppendLine("## 六、流程控制节点");
-            sb.AppendLine();
-            sb.AppendLine("1. 空节点 — 占位/分组标记");
-            sb.AppendLine("2. 停止任务 — 终止脚本执行");
-            sb.AppendLine("3. 显示变量 — 输出变量值到日志");
-            sb.AppendLine("4. 提示弹窗 — 弹出提示信息");
-            sb.AppendLine("5. 计算函数 — 执行计算并存入全局变量");
-            sb.AppendLine("6. 执行任务 — 嵌套调用另一个脚本");
-            sb.AppendLine("7. 插队 — 将指定脚本插入任务队列最前端");
-            sb.AppendLine("8. PowerShell指令 — 执行PowerShell命令");
-            sb.AppendLine("9. 远程指令 — 阻塞等待远程HTTP指令");
-            sb.AppendLine("10. HTTP请求 — 发送HTTP请求");
-            sb.AppendLine("11. CSharp脚本 — 动态执行C#代码");
-            sb.AppendLine();
-            sb.AppendLine("## 七、命名要求");
-            sb.AppendLine();
-            sb.AppendLine("- 节点名字使用动宾结构（如'点击签到按钮'、'输入用户名'）");
-            sb.AppendLine("- 节点备注补充上下文信息（如'此处签到按钮可能在弹窗后出现'）");
-            sb.AppendLine("- 不同节点的名字应能明显区分，避免同名");
+            sb.AppendLine("七、命名: 动宾结构(如'点击签到按钮'), 备注补充上下文, 避免同名");
 
             return sb.ToString().TrimEnd();
         }
