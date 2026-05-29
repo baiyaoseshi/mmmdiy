@@ -426,7 +426,7 @@ namespace 淼喵妙神奇工具库
                 {
                     Model = model,
                     Prompt = 提示词,
-                    Stream = false,
+                    Stream = true,
                     Options = config.温度.HasValue ? new RequestOptions { Temperature = config.温度.Value } : null
                 };
 
@@ -484,7 +484,8 @@ namespace 淼喵妙神奇工具库
                 {
                     ["model"] = model,
                     ["messages"] = messages,
-                    ["max_tokens"] = config.最大输出Token > 0 ? config.最大输出Token : 8192
+                    ["max_tokens"] = config.最大输出Token > 0 ? config.最大输出Token : 8192,
+                    ["stream"] = true
                 };
                 if (config.温度.HasValue)
                     请求体["temperature"] = config.温度.Value;
@@ -494,9 +495,26 @@ namespace 淼喵妙神奇工具库
                 var response = await httpClient.PostAsync(apiUrl, jsonContent);
                 if (response.IsSuccessStatusCode)
                 {
-                    var responseBody = await response.Content.ReadAsStringAsync();
-                    using var doc = JsonDocument.Parse(responseBody);
-                    return doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
+                    var stream = await response.Content.ReadAsStreamAsync();
+                    var reader = new StreamReader(stream);
+                    var sb = new StringBuilder();
+                    while (!reader.EndOfStream)
+                    {
+                        var line = await reader.ReadLineAsync();
+                        if (string.IsNullOrEmpty(line)) continue;
+                        if (!line.StartsWith("data: ")) continue;
+                        string data = line.Substring(6);
+                        if (data == "[DONE]") break;
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(data);
+                            var delta = doc.RootElement.GetProperty("choices")[0].GetProperty("delta");
+                            if (delta.TryGetProperty("content", out var ct) && ct.GetString() != null)
+                                sb.Append(ct.GetString());
+                        }
+                        catch { }
+                    }
+                    return sb.Length > 0 ? sb.ToString() : null;
                 }
                 else
                 {
@@ -554,7 +572,7 @@ namespace 淼喵妙神奇工具库
                 {
                     Model = model,
                     Prompt = 提示词,
-                    Stream = false,
+                    Stream = true,
                     Images = new string[] { rawBase64 },
                     Options = config.温度.HasValue ? new RequestOptions { Temperature = config.温度.Value } : null
                 };
@@ -608,19 +626,42 @@ namespace 淼喵妙神奇工具库
             using var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
-            var requestBody = new { model, messages };
+            var requestBody = new Dictionary<string, object>
+            {
+                ["model"] = model,
+                ["messages"] = messages,
+                ["stream"] = true
+            };
             var jsonContent = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
 
             var response = await httpClient.PostAsync(apiUrl, jsonContent).ConfigureAwait(false);
-            var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
             if (response.IsSuccessStatusCode)
             {
-                using var doc = JsonDocument.Parse(responseBody);
-                return doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
+                var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                var reader = new StreamReader(stream);
+                var sb = new StringBuilder();
+                while (!reader.EndOfStream)
+                {
+                    var line = await reader.ReadLineAsync().ConfigureAwait(false);
+                    if (string.IsNullOrEmpty(line)) continue;
+                    if (!line.StartsWith("data: ")) continue;
+                    string data = line.Substring(6);
+                    if (data == "[DONE]") break;
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(data);
+                        var delta = doc.RootElement.GetProperty("choices")[0].GetProperty("delta");
+                        if (delta.TryGetProperty("content", out var ct) && ct.GetString() != null)
+                            sb.Append(ct.GetString());
+                    }
+                    catch { }
+                }
+                return sb.Length > 0 ? sb.ToString() : null;
             }
 
-            string 截断错误 = responseBody.Length > 500 ? responseBody.Substring(0, 500) : responseBody;
+            var errorBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            string 截断错误 = errorBody.Length > 500 ? errorBody.Substring(0, 500) : errorBody;
             throw new InvalidOperationException($"视觉AI API 返回 HTTP {(int)response.StatusCode}: {截断错误}");
         }
 
