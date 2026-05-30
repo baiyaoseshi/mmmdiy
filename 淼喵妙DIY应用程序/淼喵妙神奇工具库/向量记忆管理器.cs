@@ -75,9 +75,23 @@ namespace 淼喵妙神奇工具库
 
             await 启动ChromaDB服务().ConfigureAwait(false);
 
-            for (int i = 0; i < 15; i++)
+            if (_chroma进程 == null)
+                System.Diagnostics.Debug.WriteLine("ChromaDB 进程未启动（Python路径或脚本未找到）");
+
+            for (int i = 0; i < 60; i++)
             {
                 await Task.Delay(1000).ConfigureAwait(false);
+                if (_chroma进程 != null && _chroma进程.HasExited)
+                {
+                    try
+                    {
+                        var err = await _chroma进程.StandardError.ReadToEndAsync().ConfigureAwait(false);
+                        System.Diagnostics.Debug.WriteLine($"ChromaDB 进程异常退出: {err}");
+                        通知工具.吐司通知($"⚠️ ChromaDB 启动失败\n{err.Split('\n').FirstOrDefault()?.Trim() ?? ""}");
+                    }
+                    catch { }
+                    break;
+                }
                 if (await 尝试连接(chroma服务地址).ConfigureAwait(false))
                     return true;
             }
@@ -144,15 +158,19 @@ namespace 淼喵妙神奇工具库
                     return;
                 }
 
-                var 数据目录 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "淼喵妙脚本DIY", "chroma_data");
-                Directory.CreateDirectory(数据目录);
+                var 脚本路径 = 查找启动脚本(python路径);
+                if (脚本路径 == null)
+                {
+                    通知工具.吐司通知("⚠️ 未找到 start_chromadb.py，无法自动启动 ChromaDB");
+                    return;
+                }
 
                 _chroma进程 = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = python路径,
-                        Arguments = $"-m chromadb run --path \"{数据目录}\" --port 8000",
+                        Arguments = $"\"{脚本路径}\"",
                         UseShellExecute = false,
                         CreateNoWindow = true,
                         RedirectStandardOutput = true,
@@ -161,7 +179,7 @@ namespace 淼喵妙神奇工具库
                 };
 
                 _chroma进程.Start();
-                await Task.Delay(500).ConfigureAwait(false);
+                await Task.Delay(1000).ConfigureAwait(false);
 
                 if (_chroma进程.HasExited)
                 {
@@ -181,7 +199,7 @@ namespace 淼喵妙神奇工具库
             var 候选路径列表 = new List<string>();
 
             var 应用目录 = AppDomain.CurrentDomain.BaseDirectory;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 10; i++)
             {
                 var venvPath = Path.Combine(应用目录, ".venv", "Scripts", "python.exe");
                 if (File.Exists(venvPath))
@@ -231,6 +249,26 @@ namespace 淼喵妙神奇工具库
             }
             catch { }
 
+            return null;
+        }
+
+        private static string 查找启动脚本(string python路径)
+        {
+            try
+            {
+                var pythonDir = Path.GetDirectoryName(python路径);
+                for (int i = 0; i < 5; i++)
+                {
+                    var 脚本路径 = Path.Combine(pythonDir, "start_chromadb.py");
+                    if (File.Exists(脚本路径))
+                        return 脚本路径;
+                    pythonDir = Directory.GetParent(pythonDir)?.FullName;
+                    if (pythonDir == null) break;
+                    pythonDir = Directory.GetParent(pythonDir)?.FullName;
+                    if (pythonDir == null) break;
+                }
+            }
+            catch { }
             return null;
         }
 

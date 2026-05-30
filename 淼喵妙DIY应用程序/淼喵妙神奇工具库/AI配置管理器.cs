@@ -730,12 +730,6 @@ namespace 淼喵妙神奇工具库
         {
             if (config == null) return null;
 
-            if (!向量记忆管理器.是否可用)
-            {
-                var 记忆任务 = AI使用经验管理器.初始化向量记忆();
-                await Task.WhenAny(记忆任务, Task.Delay(30000)).ConfigureAwait(false);
-            }
-
             if (是否训练中)
             {
                 回调?.Invoke("模型训练中，请稍候再试");

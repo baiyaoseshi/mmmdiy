@@ -323,6 +323,8 @@ namespace 淼喵妙用户界面.ViewModels
         {
             SelectedPage = null;
             IsAIPage = true;
+            if (!淼喵妙神奇工具库.向量记忆管理器.是否可用)
+                _ = 淼喵妙神奇工具库.AI使用经验管理器.初始化向量记忆();
         }
 
         /// <summary>
