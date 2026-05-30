@@ -2,6 +2,10 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -173,6 +177,117 @@ namespace 淼喵妙用户界面.Controls
 
             ConfigListBox.ItemsSource = null;
             ConfigListBox.ItemsSource = _配置列表;
+        }
+
+        private async void TestConnection_Click(object sender, RoutedEventArgs e)
+        {
+            保存编辑器值到当前配置();
+            if (_当前编辑配置 == null || _当前编辑配置.配置 == null)
+            {
+                通知工具.警告弹窗("请先选择一个配置。");
+                return;
+            }
+
+            var cfg = _当前编辑配置.配置;
+            var 按钮 = sender as Button;
+            if (按钮 != null) 按钮.IsEnabled = false;
+
+            try
+            {
+                if (cfg.提供者类型 == "Ollama本地")
+                {
+                    await 测试Ollama连接(cfg);
+                }
+                else
+                {
+                    await 测试远程API连接(cfg);
+                }
+            }
+            finally
+            {
+                if (按钮 != null) 按钮.IsEnabled = true;
+            }
+        }
+
+        private async Task 测试Ollama连接(AIConfigData cfg)
+        {
+            string host = string.IsNullOrEmpty(cfg.Ollama地址) ? "http://localhost:11434" : cfg.Ollama地址;
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            try
+            {
+                var response = await client.GetAsync($"{host}/api/tags").ConfigureAwait(true);
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(json);
+                    var models = doc.RootElement.TryGetProperty("models", out var arr) ? arr.GetArrayLength() : 0;
+                    通知工具.信息弹窗($"Ollama 连接成功！\n地址: {host}\n已加载模型数: {models}");
+                }
+                else
+                {
+                    通知工具.警告弹窗($"Ollama 连接失败\n地址: {host}\nHTTP {(int)response.StatusCode}: {response.ReasonPhrase}");
+                }
+            }
+            catch (TaskCanceledException)
+            {
+                通知工具.警告弹窗($"Ollama 连接超时\n地址: {host}\n请检查 Ollama 服务是否已启动。");
+            }
+            catch (HttpRequestException ex)
+            {
+                通知工具.警告弹窗($"无法连接到 Ollama\n地址: {host}\n{ex.Message}");
+            }
+        }
+
+        private async Task 测试远程API连接(AIConfigData cfg)
+        {
+            string apiUrl = cfg.远程API地址;
+            string apiKey = AI配置管理器.解密密钥(cfg.加密API密钥);
+            string model = string.IsNullOrEmpty(cfg.远程模型) ? "gpt-4o-mini" : cfg.远程模型;
+
+            if (string.IsNullOrEmpty(apiUrl))
+            {
+                通知工具.警告弹窗("远程 API 地址为空，请填写 API 地址。");
+                return;
+            }
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                通知工具.警告弹窗("API 密钥为空，请填写密钥。");
+                return;
+            }
+
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+            var 请求体 = new
+            {
+                model,
+                messages = new[] { new { role = "user", content = "hi" } },
+                max_tokens = 1
+            };
+            var content = new StringContent(JsonSerializer.Serialize(请求体), Encoding.UTF8, "application/json");
+
+            try
+            {
+                var response = await client.PostAsync(apiUrl, content).ConfigureAwait(true);
+                if (response.IsSuccessStatusCode)
+                {
+                    通知工具.信息弹窗($"API 连接成功！\n地址: {apiUrl}\n模型: {model}");
+                }
+                else
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    string 摘要 = body.Length > 200 ? body.Substring(0, 200) + "..." : body;
+                    通知工具.警告弹窗($"API 连接失败\n地址: {apiUrl}\n模型: {model}\nHTTP {(int)response.StatusCode}\n{摘要}");
+                }
+            }
+            catch (TaskCanceledException)
+            {
+                通知工具.警告弹窗($"API 连接超时\n地址: {apiUrl}\n请检查网络和 API 地址是否正确。");
+            }
+            catch (HttpRequestException ex)
+            {
+                通知工具.警告弹窗($"无法连接到 API\n地址: {apiUrl}\n{ex.Message}");
+            }
         }
 
         private void SelectedProviderComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

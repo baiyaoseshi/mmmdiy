@@ -734,5 +734,110 @@ namespace 淼喵妙神奇工具库
             await Task.CompletedTask;
         }
 
+        public static async Task<bool> 初始化向量记忆(string chroma地址 = "http://localhost:8000")
+        {
+            return await 向量记忆管理器.初始化(chroma地址).ConfigureAwait(false);
+        }
+
+        public static async Task 存储工具经验到向量库(工具调用记录 记录, AIConfigData config)
+        {
+            if (!向量记忆管理器.是否可用) return;
+            if (config == null) return;
+
+            try
+            {
+                var 文档文本 = 构建工具经验文档(记录);
+                var 向量 = await 嵌入服务.生成嵌入(文档文本, config).ConfigureAwait(false);
+                if (向量.Length == 0) return;
+
+                var 唯一Id = $"tool_{记录.工具ID}_{记录.调用时间:yyyyMMddHHmmssfff}";
+                var 元数据 = new Dictionary<string, object>
+                {
+                    ["工具ID"] = 记录.工具ID,
+                    ["是否成功"] = 记录.是否成功,
+                    ["耗时ms"] = 记录.耗时ms,
+                    ["对话ID"] = 记录.对话ID,
+                    ["时间戳"] = 记录.调用时间.ToString("o")
+                };
+
+                await 向量记忆管理器.添加工具经验(唯一Id, 文档文本, 向量, 元数据).ConfigureAwait(false);
+            }
+            catch { }
+        }
+
+        public static async Task 存储计划到向量库(计划节点 计划, AIConfigData config)
+        {
+            if (!向量记忆管理器.是否可用) return;
+            if (计划 == null || config == null) return;
+
+            try
+            {
+                var 文档文本 = 计划转为文本(计划);
+                if (string.IsNullOrEmpty(文档文本)) return;
+
+                var 向量 = await 嵌入服务.生成嵌入(文档文本, config).ConfigureAwait(false);
+                if (向量.Length == 0) return;
+
+                var 唯一Id = $"plan_{Guid.NewGuid():N}";
+                var 元数据 = new Dictionary<string, object>
+                {
+                    ["需求"] = 计划.需求 ?? "",
+                    ["工具ID"] = 计划.工具ID ?? "",
+                    ["时间戳"] = DateTime.Now.ToString("o")
+                };
+
+                await 向量记忆管理器.添加计划模板(唯一Id, 文档文本, 向量, 元数据).ConfigureAwait(false);
+            }
+            catch { }
+        }
+
+        public static async Task<string> 检索相关经验(string 查询上下文, AIConfigData config,
+            string 对话Id = null, int topK = 5)
+        {
+            if (!向量记忆管理器.是否可用 || config == null || string.IsNullOrEmpty(查询上下文))
+                return "";
+
+            try
+            {
+                var 工具经验 = await 向量记忆管理器.语义搜索工具经验(查询上下文, config, topK).ConfigureAwait(false);
+                var 计划模板 = await 向量记忆管理器.语义搜索计划模板(查询上下文, config, topK).ConfigureAwait(false);
+                var 对话记忆 = 对话Id != null
+                    ? await 向量记忆管理器.语义搜索对话记忆(查询上下文, config, 对话Id, topK).ConfigureAwait(false)
+                    : null;
+
+                return 向量记忆管理器.构建记忆上下文(工具经验, 对话记忆, 计划模板);
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        public static async Task 存储对话到向量记忆(string 对话Id, string 内容摘要, AIConfigData config)
+        {
+            if (!向量记忆管理器.是否可用 || config == null || string.IsNullOrEmpty(内容摘要)) return;
+
+            try
+            {
+                var 向量 = await 嵌入服务.生成嵌入(内容摘要, config).ConfigureAwait(false);
+                if (向量.Length == 0) return;
+
+                var 唯一Id = $"mem_{Guid.NewGuid():N}";
+                await 向量记忆管理器.添加对话记忆(唯一Id, 内容摘要, 向量, 对话Id).ConfigureAwait(false);
+            }
+            catch { }
+        }
+
+        private static string 构建工具经验文档(工具调用记录 记录)
+        {
+            var 结果状态 = 记录.是否成功 ? "成功" : "失败";
+            var 参数摘要 = 记录.输入参数 != null && 记录.输入参数.Count > 0
+                ? string.Join(", ", 记录.输入参数
+                    .Where(kv => !kv.Key.StartsWith("__"))
+                    .Select(kv => $"{kv.Key}={kv.Value}"))
+                : "无参数";
+            return $"工具ID={记录.工具ID} | 结果={结果状态} | 耗时={记录.耗时ms}ms | 参数=[{参数摘要}] | 输出={记录.输出摘要}";
+        }
+
     }
 }

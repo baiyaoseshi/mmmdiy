@@ -730,6 +730,12 @@ namespace 淼喵妙神奇工具库
         {
             if (config == null) return null;
 
+            if (!向量记忆管理器.是否可用)
+            {
+                var 记忆任务 = AI使用经验管理器.初始化向量记忆();
+                await Task.WhenAny(记忆任务, Task.Delay(30000)).ConfigureAwait(false);
+            }
+
             if (是否训练中)
             {
                 回调?.Invoke("模型训练中，请稍候再试");
@@ -756,7 +762,8 @@ namespace 淼喵妙神奇工具库
 
                 var 工具描述 = 工具列表 != null ? MCP工具管理器.构建Ollama工具描述(工具列表) : "";
                 var 分类规则提示词 = 工具列表 != null ? 收集分类规则提示词(工具列表) : "";
-                var 提示词 = 构建提示词(消息历史, 自定义规则) + 工具描述 + 分类规则提示词;
+                var 记忆上下文 = await 构建记忆上下文(消息历史, config, 当前对话Id上下文?.Value).ConfigureAwait(false);
+                var 提示词 = 构建提示词(消息历史, 自定义规则) + 记忆上下文 + 工具描述 + 分类规则提示词;
                 var client = new OllamaApiClient(new Uri(host));
 
                 var request = new OllamaSharp.Models.GenerateRequest
@@ -790,7 +797,10 @@ namespace 淼喵妙神奇工具库
 
                 var 提取计划 = AI使用经验管理器.从回复中提取计划(回复文本);
                 if (提取计划 != null)
+                {
                     当前计划树 = 提取计划;
+                    _ = AI使用经验管理器.存储计划到向量库(提取计划, config);
+                }
 
                 var 树修改列表 = new List<计划节点>();
                 var 对话Id上下文 = 当前对话Id上下文?.Value;
@@ -836,6 +846,7 @@ namespace 淼喵妙神奇工具库
                                     AI使用经验管理器.追加训练样本(记录ForEval, quality, match, 印象.当前印象, 印象版本);
                                 }
                             }
+                            await AI使用经验管理器.存储工具经验到向量库(记录ForEval, config).ConfigureAwait(false);
                         }
                         catch { }
                     });
@@ -886,6 +897,11 @@ namespace 淼喵妙神奇工具库
             if (!string.IsNullOrEmpty(分类规则提示词))
             {
                 messages.Insert(1, new { role = "system", content = 分类规则提示词 });
+            }
+            var 记忆上下文 = await 构建记忆上下文(消息历史, config, 当前对话Id上下文?.Value).ConfigureAwait(false);
+            if (!string.IsNullOrEmpty(记忆上下文))
+            {
+                messages.Insert(1, new { role = "system", content = 记忆上下文 });
             }
             var apiKey = 解密密钥(config.加密API密钥);
             string model = string.IsNullOrEmpty(config.远程模型) ? "gpt-4o-mini" : config.远程模型;
@@ -1007,7 +1023,10 @@ namespace 淼喵妙神奇工具库
                 {
                     var 提取计划 = AI使用经验管理器.从回复中提取计划(累计回复.ToString());
                     if (提取计划 != null)
+                    {
                         当前计划树 = 提取计划;
+                        _ = AI使用经验管理器.存储计划到向量库(提取计划, config);
+                    }
 
                     System.Diagnostics.Debug.WriteLine($"[MSG] finishReason={finishReason}, 执行{工具列表.Count}工具, 列表: {string.Join(",", 工具列表.Select(t => t.工具ID))}");
                     已执行工具 = true;
@@ -1066,6 +1085,7 @@ namespace 淼喵妙神奇工具库
                                         AI使用经验管理器.追加训练样本(记录ForEval, quality, match, 印象.当前印象, 印象版本);
                                     }
                                 }
+                                await AI使用经验管理器.存储工具经验到向量库(记录ForEval, config).ConfigureAwait(false);
                             }
                             catch { }
                         });
@@ -1196,6 +1216,20 @@ namespace 淼喵妙神奇工具库
 
             foreach (var 子 in node.子节点)
                 渲染分类树(子, sb, 深度 + 1, new HashSet<string>(祖先已输出规则));
+        }
+
+        private static async Task<string> 构建记忆上下文(List<AIChatMessage> 消息历史, AIConfigData config, string 对话Id = null)
+        {
+            try
+            {
+                if (!向量记忆管理器.是否可用) return "";
+                var 用户消息 = 消息历史.Where(m => m.角色 == "用户").Select(m => m.内容).ToList();
+                if (用户消息.Count == 0) return "";
+                var 查询 = 用户消息.Last();
+                if (string.IsNullOrEmpty(查询) || 查询.Length > 500) return "";
+                return await AI使用经验管理器.检索相关经验(查询, config, 对话Id).ConfigureAwait(false);
+            }
+            catch { return ""; }
         }
 
         private static List<object> 构建消息列表(List<AIChatMessage> 消息历史, string 自定义规则)

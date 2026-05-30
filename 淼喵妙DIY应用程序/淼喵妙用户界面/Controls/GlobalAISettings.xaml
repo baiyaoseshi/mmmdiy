@@ -39,9 +39,13 @@
                 <Grid>
                     <TextBlock Text="配置编辑" FontSize="14" FontWeight="Bold" Foreground="#FF333333"
                                VerticalAlignment="Center"/>
-                    <Button Content="保存配置" Height="30" HorizontalAlignment="Right"
-                            Background="#FF2196F3" Foreground="White" FontSize="12" Click="SaveCurrentConfig_Click"
-                            Padding="12,0"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="测试连接" Height="30" Background="#FFFF9800" Foreground="White"
+                                FontSize="12" Click="TestConnection_Click" Padding="12,0" Margin="0,0,6,0"/>
+                        <Button Content="保存配置" Height="30"
+                                Background="#FF2196F3" Foreground="White" FontSize="12" Click="SaveCurrentConfig_Click"
+                                Padding="12,0"/>
+                    </StackPanel>
                 </Grid>
 
                 <TextBlock Text="配置名称" FontSize="12" FontWeight="Bold" Foreground="#FF555555" Margin="0,2,0,2"/>

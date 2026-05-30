@@ -17,6 +17,7 @@ namespace 淼喵妙神奇工具库
         public string Google搜索引擎ID { get; set; } = "";
         public int 最大输出Token { get; set; } = 8192;
         public float? 温度 { get; set; } = null;
+        public string 嵌入模型 { get; set; } = "nomic-embed-text";
     }
 
     public class AINamedConfig

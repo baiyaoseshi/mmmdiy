@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ChromaDB.Client" Version="1.0.0" />
     <PackageReference Include="H.InputSimulator" Version="1.5.0" />
     <PackageReference Include="Markdig" Version="1.2.0" />
     <PackageReference Include="mcpdotnet" Version="1.2.0.1" />
