@@ -87,13 +87,6 @@ namespace 淼喵妙用户界面.Controls
                 MultimodalModelComboBox.Items.Add(new 配置选项 { Id = cfg.Id, 显示名 = cfg.名称 });
             }
 
-            LocalModelComboBox.Items.Clear();
-            LocalModelComboBox.Items.Add(new 配置选项 { Id = "", 显示名 = "使用文本模型" });
-            foreach (var cfg in _可用配置列表)
-            {
-                LocalModelComboBox.Items.Add(new 配置选项 { Id = cfg.Id, 显示名 = cfg.名称 });
-            }
-
             string 上次文本Id = AI配置管理器.获取上次文本配置Id();
             配置选项 文本默认选中 = null;
             if (!string.IsNullOrEmpty(对话.文本AI配置Id))
@@ -113,9 +106,6 @@ namespace 淼喵妙用户界面.Controls
             if (多模态默认选中 == null)
                 多模态默认选中 = MultimodalModelComboBox.Items.OfType<配置选项>().FirstOrDefault(i => i.Id == "");
             MultimodalModelComboBox.SelectedItem = 多模态默认选中;
-
-            配置选项 本地默认选中 = LocalModelComboBox.Items.OfType<配置选项>().FirstOrDefault(i => i.Id == "");
-            LocalModelComboBox.SelectedItem = 本地默认选中;
         }
 
         public void 更新分类列表(IEnumerable<string> 所有分类)

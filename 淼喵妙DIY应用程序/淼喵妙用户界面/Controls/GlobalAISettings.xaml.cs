@@ -58,7 +58,9 @@ namespace 淼喵妙用户界面.Controls
             更新快捷指令列表(AI配置管理器.获取全局快捷指令());
 
             var ollama列表 = 原始列表
-                .Where(c => c.配置?.提供者类型 == "Ollama本地" && !string.IsNullOrEmpty(c.配置?.Ollama模型))
+                .Where(c => !string.IsNullOrEmpty(c.配置?.Ollama模型)
+                    && c.配置?.提供者类型 != "OpenAI 兼容 API"
+                    && c.配置?.提供者类型 != "DashScope (阿里云)")
                 .ToList();
             var 经验Id = ExperienceAIConfigComboBox;
             if (经验Id != null)
@@ -68,6 +70,17 @@ namespace 淼喵妙用户界面.Controls
                 经验Id.DisplayMemberPath = "名称";
                 if (ollama列表.Count > 0)
                     经验Id.SelectedIndex = 0;
+            }
+
+            var mainVM = System.Windows.Application.Current.MainWindow?.DataContext as MainWindowViewModel;
+            if (mainVM != null)
+            {
+                mainVM.PropertyChanged += (s, e) =>
+                {
+                    if (e.PropertyName == nameof(mainVM.训练进度))
+                        Dispatcher.InvokeAsync(() => TrainingProgressText.Text = mainVM.训练进度);
+                };
+                TrainingProgressText.Text = mainVM.训练进度;
             }
         }
 

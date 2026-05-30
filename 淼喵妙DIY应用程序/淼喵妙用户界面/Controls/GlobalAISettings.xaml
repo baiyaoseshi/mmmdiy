@@ -109,7 +109,7 @@
                          Text="始终用中文回复"/>
 
                 <TextBlock Text="AI 自主学习" FontSize="14" FontWeight="Bold" Foreground="#FF333333" Margin="0,14,0,5"/>
-                <CheckBox x:Name="EnableSelfLearningCheckBox" Content="启用自主学习（AI 自动总结经验，对用户隐藏）" 
+                <CheckBox x:Name="EnableSelfLearningCheckBox" Content="启用印象学习与训练（自动评估工具调用、管理印象、收集训练数据）" 
                           FontSize="12" Foreground="#FF555555" Margin="0,2"/>
                 <CheckBox x:Name="EnableStatisticsCheckBox" Content="启用增量记录（记录每次工具调用原始数据，供微调分析）"
                           FontSize="12" Foreground="#FF555555" Margin="0,2"/>

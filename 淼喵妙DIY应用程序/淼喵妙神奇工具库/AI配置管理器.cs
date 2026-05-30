@@ -796,7 +796,7 @@ namespace 淼喵妙神奇工具库
                 var 对话Id上下文 = 当前对话Id上下文?.Value;
                 var 工具结果 = 工具列表 != null && 工具列表.Count > 0
                     ? MCP工具管理器.解析ToolCall响应(回复文本, 工具列表, async msg => { if (进度回调 != null) await 进度回调(msg); }, 对话Id上下文, 0, 当前计划树, 树修改列表)
-                    : new List<string>();
+                    : new List<工具执行结果>();
 
                 if (当前计划树 != null && 树修改列表.Count > 0)
                 {
@@ -807,15 +807,15 @@ namespace 淼喵妙神奇工具库
                 if (工具结果.Count == 0)
                     return 完整回复.Length > 0 ? 完整回复.ToString() : null;
 
-                foreach (var result in 工具结果)
+                foreach (var item in 工具结果)
                 {
                     var 记录ForEval = new 工具调用记录
                     {
-                        工具ID = "",
+                        工具ID = item.工具ID,
                         调用时间 = DateTime.Now,
                         输入参数 = new Dictionary<string, object>(),
-                        是否成功 = !result.Contains("执行失败"),
-                        输出摘要 = result,
+                        是否成功 = !item.结果.Contains("执行失败"),
+                        输出摘要 = item.结果,
                         对话ID = 对话Id上下文 ?? "",
                         对话轮次 = 0,
                         调用时计划树 = 当前计划树
@@ -825,7 +825,7 @@ namespace 淼喵妙神奇工具库
                         try
                         {
                             var 经验配置 = 获取经验AI配置();
-                            if (经验配置 != null)
+                            if (经验配置 != null && 获取启用自主学习())
                             {
                                 var (quality, match, reason, tags) = await AI使用经验管理器.评估工具调用(经验配置, 记录ForEval).ConfigureAwait(false);
                                 AI使用经验管理器.更新印象(记录ForEval.工具ID, match, reason, 记录ForEval);
@@ -840,17 +840,17 @@ namespace 淼喵妙神奇工具库
                         catch { }
                     });
 
-                    string 工具消息 = $"🔧 {result}";
+                    string 工具消息 = $"🔧 {item.结果}";
                     if (工具回调 != null)
                         await 工具回调(工具消息);
                     else
-                        await 回调($"\n\n[工具执行结果] {result}\n\n");
+                        await 回调($"\n\n[工具执行结果] {item.结果}\n\n");
                 }
 
                 var 新历史 = new List<AIChatMessage>(消息历史)
                 {
                     new AIChatMessage { 角色 = "AI", 内容 = 回复文本 },
-                    new AIChatMessage { 角色 = "系统", 内容 = "[工具执行结果]\n" + string.Join("\n", 工具结果) + "\n\n请基于以上工具执行结果继续回答用户的问题。", 是否私有 = true }
+                    new AIChatMessage { 角色 = "系统", 内容 = "[工具执行结果]\n" + string.Join("\n", 工具结果.Select(r => r.结果)) + "\n\n请基于以上工具执行结果继续回答用户的问题。", 是否私有 = true }
                 };
 
                 try
@@ -1055,7 +1055,7 @@ namespace 淼喵妙神奇工具库
                             try
                             {
                                 var 经验配置 = 获取经验AI配置();
-                                if (经验配置 != null)
+                                if (经验配置 != null && 获取启用自主学习())
                                 {
                                     var (quality, match, reason, tags) = await AI使用经验管理器.评估工具调用(经验配置, 记录ForEval).ConfigureAwait(false);
                                     AI使用经验管理器.更新印象(记录ForEval.工具ID, match, reason, 记录ForEval);

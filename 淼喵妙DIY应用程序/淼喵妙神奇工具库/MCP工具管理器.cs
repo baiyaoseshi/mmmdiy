@@ -22,8 +22,13 @@ namespace 淼喵妙神奇工具库
         public List<string> 祖先AI规则列表 { get; set; } = new List<string>();
         public List<string> 祖先分类路径列表 { get; set; } = new List<string>();
         public object 参数Schema { get; set; }
-        public bool 已有统计数据 { get; set; }
         public string 脚本Id { get; set; } = "";
+    }
+
+    public class 工具执行结果
+    {
+        public string 工具ID { get; set; } = "";
+        public string 结果 { get; set; } = "";
     }
 
     public static class MCP工具管理器
@@ -132,7 +137,7 @@ namespace 淼喵妙神奇工具库
                         脚本Id = Guid.NewGuid().ToString("N");
                     }
 
-                    string 基础ID = "tool_" + 脚本Id.Substring(0, 12);
+                    string 基础ID = "tool_" + 脚本Id;
 
                     工具列表.Add(new MCPToolDefinition
                     {
@@ -211,15 +216,28 @@ namespace 淼喵妙神奇工具库
             sb.AppendLine();
             foreach (var tool in tools)
             {
+                string 描述行;
                 if (通用MCP工具.内置工具ID列表.Contains(tool.工具ID))
                 {
-                    sb.AppendLine($"- {tool.工具ID} [带参数]: {tool.名称} - {tool.描述}");
+                    描述行 = $"- {tool.工具ID} [带参数]: {tool.名称} - {tool.描述}";
                 }
                 else
                 {
                     string 分类标记 = string.IsNullOrEmpty(tool.分类路径) ? "" : $" [分类: {tool.分类路径}]";
-                    sb.AppendLine($"- {tool.工具ID}{分类标记}: {tool.名称} - {tool.描述}");
+                    描述行 = $"- {tool.工具ID}{分类标记}: {tool.名称} - {tool.描述}";
                 }
+
+                var (有印象, 置信度, _) = AI使用经验管理器.获取工具印象状态(tool.工具ID);
+                if (有印象 && 置信度 >= 0.5f)
+                {
+                    var 印象 = AI使用经验管理器.获取工具印象(tool.工具ID);
+                    if (!string.IsNullOrEmpty(印象.当前印象) && 印象.置信度 >= 0.5f)
+                    {
+                        描述行 += $" 【印象】{印象.当前印象}（置信度: {印象.置信度 * 100:F0}%）";
+                    }
+                }
+
+                sb.AppendLine(描述行);
             }
             return sb.ToString();
         }
@@ -318,9 +336,9 @@ namespace 淼喵妙神奇工具库
             }
         }
 
-        public static List<string> 解析ToolCall响应(string responseText, List<MCPToolDefinition> tools, Action<string> 进度回调 = null, string 对话ID = null, int 对话轮次 = 0, 计划节点 当前计划树 = null, List<计划节点> 树修改 = null)
+        public static List<工具执行结果> 解析ToolCall响应(string responseText, List<MCPToolDefinition> tools, Action<string> 进度回调 = null, string 对话ID = null, int 对话轮次 = 0, 计划节点 当前计划树 = null, List<计划节点> 树修改 = null)
         {
-            var results = new List<string>();
+            var results = new List<工具执行结果>();
 
             var regex = new Regex(@"<tool_call>(.*?)</tool_call>", RegexOptions.IgnoreCase);
             foreach (Match match in regex.Matches(responseText))
@@ -348,7 +366,10 @@ namespace 淼喵妙神奇工具库
                     toolName = captured;
                 }
 
-                results.Add(执行工具(toolName, tools, args, 进度回调, 对话ID, 对话轮次, 当前计划树, 树修改));
+                var tool = tools.FirstOrDefault(t => t.工具ID == toolName || t.名称 == toolName);
+                string 工具ID = tool?.工具ID ?? toolName;
+                string 结果 = 执行工具(toolName, tools, args, 进度回调, 对话ID, 对话轮次, 当前计划树, 树修改);
+                results.Add(new 工具执行结果 { 工具ID = 工具ID, 结果 = 结果 });
             }
 
             return results;
