@@ -77,6 +77,30 @@ namespace 淼喵妙神奇工具库
             PropertyNamingPolicy = null
         };
 
+        private const int 计划最大递归深度 = 20;
+
+        private static async Task<string> 调用Ollama生成(AIConfigData 配置, string 提示词, string 错误默认值 = "")
+        {
+            if (配置 == null || string.IsNullOrEmpty(配置.Ollama模型))
+                return 错误默认值;
+            try
+            {
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+                var requestBody = new { model = 配置.Ollama模型, prompt = 提示词, stream = false };
+                var response = await client.PostAsync($"{配置.Ollama地址}/api/generate",
+                    new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode) return 错误默认值;
+                var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                using var doc = JsonDocument.Parse(json);
+                return doc.RootElement.GetProperty("response").GetString() ?? 错误默认值;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[调用Ollama生成] 异常: {ex.Message}");
+                return 错误默认值;
+            }
+        }
+
         public static 统计存储根 加载统计()
         {
             lock (_统计锁)
@@ -89,7 +113,10 @@ namespace 淼喵妙神奇工具库
                         return JsonSerializer.Deserialize<统计存储根>(json, _jsonOptions) ?? new 统计存储根();
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[加载统计] 失败: {ex.Message}");
+                }
                 return new 统计存储根();
             }
         }
@@ -106,7 +133,10 @@ namespace 淼喵妙神奇工具库
                     string json = JsonSerializer.Serialize(统计, _jsonOptions);
                     File.WriteAllText(_统计文件路径, json);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[保存统计] 失败: {ex.Message}");
+                }
             }
         }
 
@@ -120,7 +150,10 @@ namespace 淼喵妙神奇工具库
                     统计.工具调用记录.Add(记录);
                     保存统计(统计);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[追加调用记录] 失败: {ex.Message}");
+                }
             }
         }
 
@@ -130,7 +163,10 @@ namespace 淼喵妙神奇工具库
             {
                 File.Delete(_统计文件路径);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[清空所有统计] 失败: {ex.Message}");
+            }
         }
 
         public static void 清空工具统计(string 工具ID)
@@ -329,14 +365,8 @@ namespace 淼喵妙神奇工具库
                              $"执行结果：{记录.输出摘要}\n" +
                              $"是否成功：{记录.是否成功}\n\n" +
                              $"请输出JSON格式：{{\"impression\": \"第一印象描述\"}}";
-                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-                var requestBody = new { model = 经验配置.Ollama模型, prompt = prompt, stream = false };
-                var response = await client.PostAsync($"{经验配置.Ollama地址}/api/generate",
-                    new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")).ConfigureAwait(false);
-                if (!response.IsSuccessStatusCode) return "";
-                var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                using var doc = JsonDocument.Parse(json);
-                var responseText = doc.RootElement.GetProperty("response").GetString() ?? "";
+                var responseText = await 调用Ollama生成(经验配置, prompt).ConfigureAwait(false);
+                if (string.IsNullOrEmpty(responseText)) return "";
                 var jsonMatch = Regex.Match(responseText, @"\{[^}]*""impression""[^}]*\}", RegexOptions.None, TimeSpan.FromSeconds(1));
                 if (jsonMatch.Success)
                 {
@@ -345,7 +375,11 @@ namespace 淼喵妙神奇工具库
                 }
                 return responseText.Trim();
             }
-            catch { return ""; }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[生成第一印象] 异常: {ex.Message}");
+                return "";
+            }
         }
 
         public static void 更新印象(string 工具ID, string impressionMatch, string 评估原因, 工具调用记录 记录)
@@ -442,7 +476,10 @@ namespace 淼喵妙神奇工具库
                         return JsonSerializer.Deserialize<印象存储根>(json, _jsonOptions) ?? new 印象存储根();
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[加载印象] 失败: {ex.Message}");
+                }
                 return new 印象存储根();
             }
         }
@@ -458,7 +495,10 @@ namespace 淼喵妙神奇工具库
                     string json = JsonSerializer.Serialize(印象, _jsonOptions);
                     File.WriteAllText(_印象文件路径, json);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[保存印象] 失败: {ex.Message}");
+                }
             }
         }
 
@@ -481,33 +521,26 @@ namespace 淼喵妙神奇工具库
                              $"耗时：{记录.耗时ms}ms\n\n" +
                              $"请输出JSON格式：{{\"quality\": \"high\"或\"low\", \"impression_match\": \"一致\"或\"偏差\"或\"矛盾\"或\"首次使用\", \"reason\": \"评估原因\", \"tags\": [\"标签1\", \"标签2\"]}}";
 
-                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-                var requestBody = new { model = 经验配置.Ollama模型, prompt = prompt, stream = false };
-                var response = await client.PostAsync($"{经验配置.Ollama地址}/api/generate",
-                    new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")).ConfigureAwait(false);
+                var responseText = await 调用Ollama生成(经验配置, prompt).ConfigureAwait(false);
 
-                if (!response.IsSuccessStatusCode)
-                    return ("low", "偏差", "经验AI调用失败", new List<string>());
-
-                var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                using var doc = JsonDocument.Parse(json);
-                var responseText = doc.RootElement.GetProperty("response").GetString() ?? "";
-
-                var jsonMatch = Regex.Match(responseText, @"\{[^}]*\}", RegexOptions.None, TimeSpan.FromSeconds(1));
-                if (jsonMatch.Success)
+                if (!string.IsNullOrEmpty(responseText))
                 {
-                    using var evalDoc = JsonDocument.Parse(jsonMatch.Value);
-                    var root = evalDoc.RootElement;
-                    var quality = root.TryGetProperty("quality", out var q) ? q.GetString() ?? "low" : "low";
-                    var match = root.TryGetProperty("impression_match", out var m) ? m.GetString() ?? "偏差" : "偏差";
-                    var reason = root.TryGetProperty("reason", out var r) ? r.GetString() ?? "" : "";
-                    var tags = new List<string>();
-                    if (root.TryGetProperty("tags", out var t) && t.ValueKind == JsonValueKind.Array)
+                    var jsonMatch = Regex.Match(responseText, @"\{[^}]*\}", RegexOptions.None, TimeSpan.FromSeconds(1));
+                    if (jsonMatch.Success)
                     {
-                        foreach (var tag in t.EnumerateArray())
-                            tags.Add(tag.GetString() ?? "");
+                        using var evalDoc = JsonDocument.Parse(jsonMatch.Value);
+                        var root = evalDoc.RootElement;
+                        var quality = root.TryGetProperty("quality", out var q) ? q.GetString() ?? "low" : "low";
+                        var match = root.TryGetProperty("impression_match", out var m) ? m.GetString() ?? "偏差" : "偏差";
+                        var reason = root.TryGetProperty("reason", out var r) ? r.GetString() ?? "" : "";
+                        var tags = new List<string>();
+                        if (root.TryGetProperty("tags", out var t) && t.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var tag in t.EnumerateArray())
+                                tags.Add(tag.GetString() ?? "");
+                        }
+                        return (quality, match, reason, tags);
                     }
-                    return (quality, match, reason, tags);
                 }
 
                 return 记录.是否成功 ? ("high", "首次使用", "自动判断：调用成功", new List<string>()) : ("low", "偏差", "自动判断：调用失败", new List<string>());
@@ -546,7 +579,10 @@ namespace 淼喵妙神奇工具库
                     string line = JsonSerializer.Serialize(sample, _jsonOptions) + Environment.NewLine;
                     File.AppendAllText(_训练数据路径, line);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[追加训练样本] 失败: {ex.Message}");
+                }
             }
         }
 
@@ -663,7 +699,7 @@ namespace 淼喵妙神奇工具库
 
         private static string 计划转为文本(计划节点 节点, int 缩进 = 0)
         {
-            if (节点 == null) return "";
+            if (节点 == null || 缩进 > 计划最大递归深度) return "";
             var sb = new StringBuilder();
             sb.AppendLine($"{new string(' ', 缩进 * 2)}- {节点.需求}" + (string.IsNullOrEmpty(节点.工具ID) ? "" : $" [{节点.工具ID}]"));
             foreach (var 子 in 节点.子步骤 ?? new List<计划节点>())
@@ -726,11 +762,13 @@ namespace 淼喵妙神奇工具库
 
         public static async Task 执行DPO优化(AIConfigData 基础配置, string 输出模型名)
         {
+            System.Diagnostics.Debug.WriteLine($"[DPO优化] 尚未实现，跳过。模型={输出模型名}");
             await Task.CompletedTask;
         }
 
         public static async Task 执行RL强化(AIConfigData 基础配置, string 输出模型名)
         {
+            System.Diagnostics.Debug.WriteLine($"[RL强化] 尚未实现，跳过。模型={输出模型名}");
             await Task.CompletedTask;
         }
 

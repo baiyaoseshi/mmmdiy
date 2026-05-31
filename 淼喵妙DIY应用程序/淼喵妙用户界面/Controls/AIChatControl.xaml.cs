@@ -103,8 +103,6 @@ namespace 淼喵妙用户界面.Controls
                         MessagesScrollViewer.ScrollToEnd();
                 }), System.Windows.Threading.DispatcherPriority.Background);
             }
-            Thread.Sleep(5);
-            文本更新完成?.Invoke();
         }
 
         public void 追加AI思考(string 文本)
@@ -114,8 +112,6 @@ namespace 淼喵妙用户界面.Controls
                 _当前流式消息.思考内容 += 文本;
                 思考更新完成?.Invoke();
             }
-            Thread.Sleep(5);
-            思考更新完成?.Invoke();
         }
 
         public string 获取当前思考内容() => _当前流式消息?.思考内容;
