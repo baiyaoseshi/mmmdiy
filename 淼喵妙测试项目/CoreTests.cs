@@ -1,9 +1,10 @@
 using Xunit;
 using 淼喵妙神奇工具库;
+using 淼喵妙测试项目.Harness;
 
 namespace 淼喵妙测试项目
 {
-    public class CoreTests
+    public class CoreTests : 测试基类
     {
         [Fact]
         public void GetGlobalConfig_ReturnsNonNullConfig()
