@@ -34,3 +34,6 @@ Thumbs.db
 .venv/
 __pycache__/
 *.pyc
+
+## AI Skills (local only, not shared)
+.trae/skills/

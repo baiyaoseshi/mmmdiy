@@ -35,6 +35,16 @@ namespace 淼喵妙神奇工具库
             PropertyNamingPolicy = null
         };
 
+        internal const string 提供者Ollama = "Ollama本地";
+        internal const string 提供者OpenAI = "OpenAI 兼容 API";
+        internal const string 默认Ollama地址 = "http://localhost:11434";
+        internal const string 默认Ollama文本模型 = "qwen2:0.5b";
+        internal const string 默认Ollama视觉模型 = "minicpm-v:latest";
+        internal const string 默认远程模型 = "gpt-4o-mini";
+        internal const string 默认远程视觉模型 = "qwen-vl-max";
+        internal const int 默认最大Token = 8192;
+        internal const int 最大工具调用轮次 = 5;
+
         static AI配置管理器()
         {
             加载数据();
@@ -54,8 +64,9 @@ namespace 淼喵妙神奇工具库
                     _数据 = new AIPersistenceData();
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AI配置] 加载数据失败: {ex.Message}");
                 _数据 = new AIPersistenceData();
             }
 
@@ -112,7 +123,10 @@ namespace 淼喵妙神奇工具库
                     string json = JsonSerializer.Serialize(_数据, _jsonOptions);
                     File.WriteAllText(数据文件路径, json);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[AI配置] 保存数据失败: {ex.Message}");
+                }
             }
         }
 
@@ -364,8 +378,9 @@ namespace 淼喵妙神奇工具库
                 byte[] encrypted = ProtectedData.Protect(data, null, DataProtectionScope.CurrentUser);
                 return Convert.ToBase64String(encrypted);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[加密密钥] 失败: {ex.Message}");
                 return "";
             }
         }
@@ -379,8 +394,9 @@ namespace 淼喵妙神奇工具库
                 byte[] decrypted = ProtectedData.Unprotect(data, null, DataProtectionScope.CurrentUser);
                 return Encoding.UTF8.GetString(decrypted);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[解密密钥] 失败: {ex.Message}");
                 return "";
             }
         }
@@ -390,9 +406,9 @@ namespace 淼喵妙神奇工具库
             if (string.IsNullOrEmpty(config.提供者类型))
             {
                 if (!string.IsNullOrEmpty(config.Ollama模型))
-                    return "Ollama本地";
+                    return 提供者Ollama;
                 if (!string.IsNullOrEmpty(config.远程API地址) && !string.IsNullOrEmpty(解密密钥(config.加密API密钥)))
-                    return "OpenAI 兼容 API";
+                    return 提供者OpenAI;
                 return "";
             }
             return config.提供者类型;
@@ -402,7 +418,7 @@ namespace 淼喵妙神奇工具库
         {
             if (config == null) return null;
 
-            if (解析提供者(config) == "Ollama本地")
+            if (解析提供者(config) == 提供者Ollama)
             {
                 return await 调用本地AI(config, 消息历史, 自定义规则);
             }
@@ -416,8 +432,8 @@ namespace 淼喵妙神奇工具库
         {
             try
             {
-                string host = string.IsNullOrEmpty(config.Ollama地址) ? "http://localhost:11434" : config.Ollama地址;
-                string model = string.IsNullOrEmpty(config.Ollama模型) ? "qwen2:0.5b" : config.Ollama模型;
+                string host = string.IsNullOrEmpty(config.Ollama地址) ? 默认Ollama地址 : config.Ollama地址;
+                string model = string.IsNullOrEmpty(config.Ollama模型) ? 默认Ollama文本模型 : config.Ollama模型;
 
                 var 提示词 = 构建提示词(消息历史, 自定义规则);
                 var client = new OllamaApiClient(new Uri(host));
@@ -440,8 +456,9 @@ namespace 淼喵妙神奇工具库
 
                 return sb.Length > 0 ? sb.ToString() : null;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[调用本地AI] 异常: {ex.Message}");
                 return null;
             }
         }
@@ -452,7 +469,7 @@ namespace 淼喵妙神奇工具库
             {
                 string apiUrl = string.IsNullOrEmpty(config.远程API地址) ? null : config.远程API地址;
                 string apiKey = 解密密钥(config.加密API密钥);
-                string model = string.IsNullOrEmpty(config.远程模型) ? "gpt-4o-mini" : config.远程模型;
+                string model = string.IsNullOrEmpty(config.远程模型) ? 默认远程模型 : config.远程模型;
 
                 if (string.IsNullOrEmpty(apiUrl) || string.IsNullOrEmpty(apiKey))
                     return null;
@@ -484,7 +501,7 @@ namespace 淼喵妙神奇工具库
                 {
                     ["model"] = model,
                     ["messages"] = messages,
-                    ["max_tokens"] = config.最大输出Token > 0 ? config.最大输出Token : 8192,
+                    ["max_tokens"] = config.最大输出Token > 0 ? config.最大输出Token : 默认最大Token,
                     ["stream"] = true
                 };
                 if (config.温度.HasValue)
@@ -512,7 +529,10 @@ namespace 淼喵妙神奇工具库
                             if (delta.TryGetProperty("content", out var ct) && ct.GetString() != null)
                                 sb.Append(ct.GetString());
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[调用远程AI] SSE解析异常: {ex.Message}");
+                        }
                     }
                     return sb.Length > 0 ? sb.ToString() : null;
                 }
@@ -521,7 +541,10 @@ namespace 淼喵妙神奇工具库
                     System.Diagnostics.Debug.WriteLine($"[AI非流式] HTTP {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[调用远程AI] 异常: {ex.Message}");
+            }
             return null;
         }
 
@@ -538,8 +561,9 @@ namespace 淼喵妙神奇工具库
                 bmp.Save(ms, ImageFormat.Png);
                 return "data:image/png;base64," + Convert.ToBase64String(ms.ToArray());
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[捕获屏幕截图] 失败: {ex.Message}");
                 return null;
             }
         }
@@ -548,7 +572,7 @@ namespace 淼喵妙神奇工具库
         {
             if (config == null) return null;
 
-            if (解析提供者(config) == "Ollama本地")
+            if (解析提供者(config) == 提供者Ollama)
                 return await 调用本地AI分析截图(config, base64Image, 提示词);
             else
                 return await 调用远程AI分析截图(config, base64Image, 提示词);
@@ -558,8 +582,8 @@ namespace 淼喵妙神奇工具库
         {
             try
             {
-                string host = string.IsNullOrEmpty(config.Ollama地址) ? "http://localhost:11434" : config.Ollama地址;
-                string model = string.IsNullOrEmpty(config.Ollama模型) ? "minicpm-v:latest" : config.Ollama模型;
+                string host = string.IsNullOrEmpty(config.Ollama地址) ? 默认Ollama地址 : config.Ollama地址;
+                string model = string.IsNullOrEmpty(config.Ollama模型) ? 默认Ollama视觉模型 : config.Ollama模型;
 
                 string rawBase64 = base64Image;
                 if (base64Image.StartsWith("data:image/png;base64,"))
@@ -598,7 +622,7 @@ namespace 淼喵妙神奇工具库
         {
             string apiUrl = config.远程API地址;
             string apiKey = 解密密钥(config.加密API密钥);
-            string model = string.IsNullOrEmpty(config.远程模型) ? "qwen-vl-max" : config.远程模型;
+            string model = string.IsNullOrEmpty(config.远程模型) ? 默认远程视觉模型 : config.远程模型;
             if (string.IsNullOrEmpty(apiUrl) || string.IsNullOrEmpty(apiKey)) return null;
 
             if (apiUrl.Contains("dashscope.aliyuncs.com"))
@@ -736,7 +760,7 @@ namespace 淼喵妙神奇工具库
                 return "模型训练中，请稍候再试";
             }
 
-            if (解析提供者(config) == "Ollama本地")
+            if (解析提供者(config) == 提供者Ollama)
             {
                 return await 调用本地AI流式带工具(config, 消息历史, 自定义规则, 工具列表, 回调, 工具回调, 思考回调, 进度回调, cancellationToken, 当前计划树);
             }
@@ -751,8 +775,8 @@ namespace 淼喵妙神奇工具库
             var 完整回复 = new StringBuilder();
             try
             {
-                string host = string.IsNullOrEmpty(config.Ollama地址) ? "http://localhost:11434" : config.Ollama地址;
-                string model = string.IsNullOrEmpty(config.Ollama模型) ? "qwen2:0.5b" : config.Ollama模型;
+                string host = string.IsNullOrEmpty(config.Ollama地址) ? 默认Ollama地址 : config.Ollama地址;
+                string model = string.IsNullOrEmpty(config.Ollama模型) ? 默认Ollama文本模型 : config.Ollama模型;
 
                 var 工具描述 = 工具列表 != null ? MCP工具管理器.构建Ollama工具描述(工具列表) : "";
                 var 分类规则提示词 = 工具列表 != null ? 收集分类规则提示词(工具列表) : "";
@@ -824,26 +848,7 @@ namespace 淼喵妙神奇工具库
                         对话轮次 = 0,
                         调用时计划树 = 当前计划树
                     };
-                    Task.Run(async () =>
-                    {
-                        try
-                        {
-                            var 经验配置 = 获取经验AI配置();
-                            if (经验配置 != null && 获取启用自主学习())
-                            {
-                                var (quality, match, reason, tags) = await AI使用经验管理器.评估工具调用(经验配置, 记录ForEval).ConfigureAwait(false);
-                                AI使用经验管理器.更新印象(记录ForEval.工具ID, match, reason, 记录ForEval);
-                                if (quality == "high")
-                                {
-                                    var 印象 = AI使用经验管理器.获取工具印象(记录ForEval.工具ID);
-                                    int 印象版本 = 印象.修正历史.Count;
-                                    AI使用经验管理器.追加训练样本(记录ForEval, quality, match, 印象.当前印象, 印象版本);
-                                }
-                            }
-                            await AI使用经验管理器.存储工具经验到向量库(记录ForEval, config).ConfigureAwait(false);
-                        }
-                        catch { }
-                    });
+                    异步记录工具调用并评估(记录ForEval, config);
 
                     string 工具消息 = $"🔧 {item.结果}";
                     if (工具回调 != null)
@@ -883,7 +888,6 @@ namespace 淼喵妙神奇工具库
         }
         private static async Task<string> 调用远程AI流式带工具(AIConfigData config, List<AIChatMessage> 消息历史, string 自定义规则, List<MCPToolDefinition> 工具列表, Func<string, Task> 回调, Func<string, Task> 工具回调, Func<string, Task> 思考回调 = null, Func<string, Task> 进度回调 = null, CancellationToken cancellationToken = default, 计划节点 当前计划树 = null)
         {
-            const int MaxToolCallRounds = 5;
             int round = 0;
 
             var messages = 构建消息列表(消息历史, 自定义规则);
@@ -898,13 +902,13 @@ namespace 淼喵妙神奇工具库
                 messages.Insert(1, new { role = "system", content = 记忆上下文 });
             }
             var apiKey = 解密密钥(config.加密API密钥);
-            string model = string.IsNullOrEmpty(config.远程模型) ? "gpt-4o-mini" : config.远程模型;
+            string model = string.IsNullOrEmpty(config.远程模型) ? 默认远程模型 : config.远程模型;
             if (string.IsNullOrEmpty(config.远程API地址) || string.IsNullOrEmpty(apiKey)) return null;
 
             var 累计回复 = new StringBuilder();
             bool 已执行工具 = false;
 
-            while (round < MaxToolCallRounds)
+            while (round < 最大工具调用轮次)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 round++;
@@ -915,7 +919,7 @@ namespace 淼喵妙神奇工具库
                 {
                     ["model"] = model,
                     ["messages"] = messages,
-                    ["max_tokens"] = config.最大输出Token > 0 ? config.最大输出Token : 8192,
+                    ["max_tokens"] = config.最大输出Token > 0 ? config.最大输出Token : 默认最大Token,
                     ["stream"] = true
                 };
                 if (工具列表 != null && 工具列表.Count > 0)
@@ -1063,26 +1067,7 @@ namespace 淼喵妙神奇工具库
                             对话轮次 = round,
                             调用时计划树 = 当前计划树
                         };
-                        Task.Run(async () =>
-                        {
-                            try
-                            {
-                                var 经验配置 = 获取经验AI配置();
-                                if (经验配置 != null && 获取启用自主学习())
-                                {
-                                    var (quality, match, reason, tags) = await AI使用经验管理器.评估工具调用(经验配置, 记录ForEval).ConfigureAwait(false);
-                                    AI使用经验管理器.更新印象(记录ForEval.工具ID, match, reason, 记录ForEval);
-                                    if (quality == "high")
-                                    {
-                                        var 印象 = AI使用经验管理器.获取工具印象(记录ForEval.工具ID);
-                                        int 印象版本 = 印象.修正历史.Count;
-                                        AI使用经验管理器.追加训练样本(记录ForEval, quality, match, 印象.当前印象, 印象版本);
-                                    }
-                                }
-                                await AI使用经验管理器.存储工具经验到向量库(记录ForEval, config).ConfigureAwait(false);
-                            }
-                            catch { }
-                        });
+                        异步记录工具调用并评估(记录ForEval, config);
 
                         tcMessages.Add(new Dictionary<string, object>
                         {
@@ -1223,7 +1208,38 @@ namespace 淼喵妙神奇工具库
                 if (string.IsNullOrEmpty(查询) || 查询.Length > 500) return "";
                 return await AI使用经验管理器.检索相关经验(查询, config, 对话Id).ConfigureAwait(false);
             }
-            catch { return ""; }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[构建记忆上下文] 异常: {ex.Message}");
+                return "";
+            }
+        }
+
+        private static void 异步记录工具调用并评估(工具调用记录 记录, AIConfigData config)
+        {
+            Task.Run(async () =>
+            {
+                try
+                {
+                    var 经验配置 = 获取经验AI配置();
+                    if (经验配置 != null && 获取启用自主学习())
+                    {
+                        var (quality, match, reason, tags) = await AI使用经验管理器.评估工具调用(经验配置, 记录).ConfigureAwait(false);
+                        AI使用经验管理器.更新印象(记录.工具ID, match, reason, 记录);
+                        if (quality == "high")
+                        {
+                            var 印象 = AI使用经验管理器.获取工具印象(记录.工具ID);
+                            int 印象版本 = 印象.修正历史.Count;
+                            AI使用经验管理器.追加训练样本(记录, quality, match, 印象.当前印象, 印象版本);
+                        }
+                    }
+                    await AI使用经验管理器.存储工具经验到向量库(记录, config).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[异步记录工具调用] 异常: {ex.Message}");
+                }
+            });
         }
 
         private static List<object> 构建消息列表(List<AIChatMessage> 消息历史, string 自定义规则)
@@ -1335,13 +1351,16 @@ namespace 淼喵妙神奇工具库
                     脚本.执行();
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[执行脚本工具] 失败: {ex.Message}");
+            }
         }
 
         public static bool 配置是否有效(AIConfigData config)
         {
             if (config == null) return false;
-            if (解析提供者(config) == "Ollama本地")
+            if (解析提供者(config) == 提供者Ollama)
             {
                 return !string.IsNullOrEmpty(config.Ollama地址);
             }

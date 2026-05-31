@@ -18,6 +18,37 @@ namespace 淼喵妙神奇工具库
 
         public static readonly string[] 内置工具ID列表 = { "ask_vision_ai", "modify_script_remark", "write_log", "read_log", "wait_until_time", "wait_for_event", "web_search", "expand_script", "search_scripts", "list_node_types", "get_node_creation_rules", "create_working_script", "add_node", "remove_node", "modify_node", "execute_node", "save_script", "list_all_scripts", "classify_script", "edit_category_rule", "create_category", "find_window", "wait_for_ai_reply" };
 
+        private static bool 尝试获取必填字符串(Dictionary<string, object> 参数, string 键名, out string 值)
+        {
+            值 = null;
+            if (!参数.TryGetValue(键名, out var obj) || string.IsNullOrEmpty(obj?.ToString()))
+                return false;
+            值 = obj.ToString();
+            return true;
+        }
+
+        private static int 获取可选整数(Dictionary<string, object> 参数, string 键名, int 默认值 = 0)
+        {
+            if (参数.TryGetValue(键名, out var obj) && obj != null)
+            {
+                if (obj is int i) return i;
+                if (int.TryParse(obj.ToString(), out var parsed)) return parsed;
+            }
+            return 默认值;
+        }
+
+        private static string 获取可选字符串(Dictionary<string, object> 参数, string 键名, string 默认值 = "")
+        {
+            if (参数.TryGetValue(键名, out var obj) && obj != null)
+                return obj.ToString();
+            return 默认值;
+        }
+
+        private static string 错误缺少参数(string 参数名)
+        {
+            return $"错误: 缺少参数 '{参数名}'";
+        }
+
         public static string 执行内置工具(string 工具ID, Dictionary<string, object> 参数, List<MCPToolDefinition> 当前工具列表 = null, string 对话Id = null)
         {
             return 工具ID switch
@@ -325,16 +356,10 @@ namespace 淼喵妙神奇工具库
 
         private static string 修改脚本备注(Dictionary<string, object> 参数, List<MCPToolDefinition> 当前工具列表)
         {
-            if (!参数.TryGetValue("新备注", out var 新备注Obj))
-                return "错误: 缺少参数 '新备注'";
-            string 新备注 = 新备注Obj?.ToString() ?? "";
-
-            string 脚本标识 = "";
-            if (参数.TryGetValue("脚本名或路径", out var 标识Obj) && 标识Obj != null)
-                脚本标识 = 标识Obj.ToString();
-
-            if (string.IsNullOrEmpty(脚本标识))
-                return "错误: 缺少参数 '脚本名或路径'";
+            if (!尝试获取必填字符串(参数, "新备注", out var 新备注))
+                return 错误缺少参数("新备注");
+            if (!尝试获取必填字符串(参数, "脚本名或路径", out var 脚本标识))
+                return 错误缺少参数("脚本名或路径");
 
             string 脚本路径 = 在工具组中查找脚本(脚本标识, 当前工具列表);
             if (脚本路径 == null || !File.Exists(脚本路径))
@@ -368,13 +393,10 @@ namespace 淼喵妙神奇工具库
 
         private static string 写日志(Dictionary<string, object> 参数)
         {
-            if (!参数.TryGetValue("日志名", out var 日志名Obj) || string.IsNullOrEmpty(日志名Obj?.ToString()))
-                return "错误: 缺少参数 '日志名'";
-            if (!参数.TryGetValue("内容", out var 内容Obj) || 内容Obj == null)
-                return "错误: 缺少参数 '内容'";
-
-            string 日志名 = 日志名Obj.ToString();
-            string 内容 = 内容Obj.ToString();
+            if (!尝试获取必填字符串(参数, "日志名", out var 日志名))
+                return 错误缺少参数("日志名");
+            if (!尝试获取必填字符串(参数, "内容", out var 内容))
+                return 错误缺少参数("内容");
 
             if (!Directory.Exists(日志目录))
                 Directory.CreateDirectory(日志目录);
@@ -387,10 +409,8 @@ namespace 淼喵妙神奇工具库
 
         private static string 读日志(Dictionary<string, object> 参数)
         {
-            if (!参数.TryGetValue("日志名", out var 日志名Obj) || string.IsNullOrEmpty(日志名Obj?.ToString()))
-                return "错误: 缺少参数 '日志名'";
-
-            string 日志名 = 日志名Obj.ToString();
+            if (!尝试获取必填字符串(参数, "日志名", out var 日志名))
+                return 错误缺少参数("日志名");
             string 文件路径 = Path.Combine(日志目录, 日志名);
 
             if (!File.Exists(文件路径))
@@ -411,10 +431,8 @@ namespace 淼喵妙神奇工具库
 
         private static string 等待时间(Dictionary<string, object> 参数, string 对话Id)
         {
-            if (!参数.TryGetValue("绝对时间", out var 时间Obj) || string.IsNullOrEmpty(时间Obj?.ToString()))
-                return "错误: 缺少参数 '绝对时间'";
-
-            string 时间字符串 = 时间Obj.ToString();
+            if (!尝试获取必填字符串(参数, "绝对时间", out var 时间字符串))
+                return 错误缺少参数("绝对时间");
 
             if (!DateTime.TryParseExact(时间字符串, "yyyy-MM-dd HH:mm:ss", null, System.Globalization.DateTimeStyles.None, out var 目标时间))
                 return $"错误: 时间格式不正确，请使用 yyyy-MM-dd HH:mm:ss 格式，例如 '2026-05-24 14:30:00'";
@@ -432,19 +450,10 @@ namespace 淼喵妙神奇工具库
 
         private static string 等待事件(Dictionary<string, object> 参数, string 对话Id)
         {
-            if (!参数.TryGetValue("事件名称", out var 名称Obj) || string.IsNullOrEmpty(名称Obj?.ToString()))
-                return "错误: 缺少参数 '事件名称'";
+            if (!尝试获取必填字符串(参数, "事件名称", out var 事件名称))
+                return 错误缺少参数("事件名称");
 
-            string 事件名称 = 名称Obj.ToString();
-            int 超时分钟 = 30;
-
-            if (参数.TryGetValue("超时分钟", out var 超时Obj) && 超时Obj != null)
-            {
-                if (超时Obj is int i)
-                    超时分钟 = i;
-                else if (int.TryParse(超时Obj.ToString(), out var parsed))
-                    超时分钟 = parsed;
-            }
+            int 超时分钟 = 获取可选整数(参数, "超时分钟", 30);
 
             if (string.IsNullOrEmpty(对话Id))
                 return "错误: 无法获取当前对话信息";
@@ -479,19 +488,10 @@ namespace 淼喵妙神奇工具库
 
         private static string 等待AI回复(Dictionary<string, object> 参数, string 对话Id)
         {
-            if (!参数.TryGetValue("对话名", out var 名称Obj) || string.IsNullOrEmpty(名称Obj?.ToString()))
-                return "错误: 缺少参数 '对话名'";
+            if (!尝试获取必填字符串(参数, "对话名", out var 对话名))
+                return 错误缺少参数("对话名");
 
-            string 对话名 = 名称Obj.ToString();
-            int 超时分钟 = 30;
-
-            if (参数.TryGetValue("超时分钟", out var 超时Obj) && 超时Obj != null)
-            {
-                if (超时Obj is int i)
-                    超时分钟 = i;
-                else if (int.TryParse(超时Obj.ToString(), out var parsed))
-                    超时分钟 = parsed;
-            }
+            int 超时分钟 = 获取可选整数(参数, "超时分钟", 30);
 
             if (string.IsNullOrEmpty(对话Id))
                 return "错误: 无法获取当前对话信息";
@@ -507,18 +507,10 @@ namespace 淼喵妙神奇工具库
 
         private static string 联网搜索(Dictionary<string, object> 参数)
         {
-            if (!参数.TryGetValue("查询关键词", out var queryObj) || string.IsNullOrEmpty(queryObj?.ToString()))
-                return "错误: 缺少参数 '查询关键词'";
+            if (!尝试获取必填字符串(参数, "查询关键词", out var query))
+                return 错误缺少参数("查询关键词");
 
-            string query = queryObj.ToString();
-            int maxResults = 5;
-            if (参数.TryGetValue("最大结果数", out var maxObj) && maxObj != null)
-            {
-                if (maxObj is int i)
-                    maxResults = Math.Clamp(i, 1, 10);
-                else if (int.TryParse(maxObj.ToString(), out var parsed))
-                    maxResults = Math.Clamp(parsed, 1, 10);
-            }
+            int maxResults = Math.Clamp(获取可选整数(参数, "最大结果数", 5), 1, 10);
 
             var 全局配置 = AI配置管理器.获取全局配置();
             string apiKey = AI配置管理器.解密密钥(全局配置.加密GoogleAPI密钥);
@@ -582,10 +574,8 @@ namespace 淼喵妙神奇工具库
 
         private static string 询问视觉AI(Dictionary<string, object> 参数)
         {
-            if (!参数.TryGetValue("提示词", out var 提示词Obj) || string.IsNullOrEmpty(提示词Obj?.ToString()))
-                return "错误: 缺少参数 '提示词'";
-
-            string 提示词 = 提示词Obj.ToString();
+            if (!尝试获取必填字符串(参数, "提示词", out var 提示词))
+                return 错误缺少参数("提示词");
 
             var 当前对话 = AI配置管理器.获取当前对话();
             AIConfigData 视觉配置;
@@ -606,10 +596,10 @@ namespace 淼喵妙神奇工具库
                 var 结果 = AI配置管理器.调用AI分析截图(视觉配置, 截图, 提示词).GetAwaiter().GetResult();
                 if (string.IsNullOrEmpty(结果))
                 {
-                    string 模型信息 = 视觉配置.提供者类型 == "Ollama本地"
+                    string 模型信息 = 视觉配置.提供者类型 == AI配置管理器.提供者Ollama
                         ? $"Ollama / {视觉配置.Ollama模型}"
                         : $"远程API / {视觉配置.远程模型}";
-                    string 地址信息 = 视觉配置.提供者类型 == "Ollama本地"
+                    string 地址信息 = 视觉配置.提供者类型 == AI配置管理器.提供者Ollama
                         ? $"地址: {视觉配置.Ollama地址}"
                         : $"地址: {视觉配置.远程API地址}";
                     return $"视觉AI分析失败。\n当前配置：{模型信息}\n{地址信息}\n\n可能原因：\n1. 模型不支持多模态（图片输入）—— 如当前模型是纯文本模型，需换成 qwen-vl-max、gpt-4o、llava 等视觉模型\n2. API 地址需包含完整路径（如末尾加 /chat/completions）\n3. API 密钥无效或余额不足\n\n请在全局设置（🌐按钮）中检查「视觉 AI 配置」。";
@@ -692,10 +682,8 @@ namespace 淼喵妙神奇工具库
 
         private static string 展开脚本(Dictionary<string, object> 参数, List<MCPToolDefinition> 当前工具列表)
         {
-            if (!参数.TryGetValue("脚本标识", out var 标识Obj) || string.IsNullOrEmpty(标识Obj?.ToString()))
-                return "错误: 缺少参数 '脚本标识'";
-
-            string 脚本标识 = 标识Obj.ToString();
+            if (!尝试获取必填字符串(参数, "脚本标识", out var 脚本标识))
+                return 错误缺少参数("脚本标识");
             string 匹配路径 = null;
             string 匹配名称 = null;
 
@@ -829,23 +817,11 @@ namespace 淼喵妙神奇工具库
 
         private static string 搜索脚本(Dictionary<string, object> 参数, List<MCPToolDefinition> 当前工具列表)
         {
-            if (!参数.TryGetValue("关键词", out var kwObj) || string.IsNullOrEmpty(kwObj?.ToString()))
-                return "错误: 缺少参数 '关键词'";
+            if (!尝试获取必填字符串(参数, "关键词", out var 关键词))
+                return 错误缺少参数("关键词");
 
-            string 关键词 = kwObj.ToString();
-
-            string 搜索范围 = "名称备注";
-            if (参数.TryGetValue("搜索范围", out var scopeObj) && scopeObj != null)
-                搜索范围 = scopeObj.ToString();
-
-            int 最大结果数 = 5;
-            if (参数.TryGetValue("最大结果数", out var maxObj) && maxObj != null)
-            {
-                if (maxObj is int i)
-                    最大结果数 = Math.Max(1, i);
-                else if (int.TryParse(maxObj.ToString(), out var parsed))
-                    最大结果数 = Math.Max(1, parsed);
-            }
+            string 搜索范围 = 获取可选字符串(参数, "搜索范围", "名称备注");
+            int 最大结果数 = Math.Max(1, 获取可选整数(参数, "最大结果数", 5));
 
             bool 搜索完整内容 = string.Equals(搜索范围, "完整内容", StringComparison.OrdinalIgnoreCase);
             var 结果 = new List<string>();
@@ -1087,7 +1063,14 @@ namespace 淼喵妙神奇工具库
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "淼喵妙脚本DIY");
         private static readonly string 用户数据路径 = Path.Combine(用户数据目录, "userdata.json");
 
+        private static Lazy<string> _节点类型缓存 = new Lazy<string>(构建节点类型文本, LazyThreadSafetyMode.ExecutionAndPublication);
+
         private static string 列出节点类型()
+        {
+            return _节点类型缓存.Value;
+        }
+
+        private static string 构建节点类型文本()
         {
             var sb = new StringBuilder();
             sb.AppendLine("可用节点类型（按分类组织）：");
@@ -1743,22 +1726,26 @@ namespace 淼喵妙神奇工具库
 
         private static string 查找窗口框(Dictionary<string, object> 参数)
         {
-            if (!参数.TryGetValue("窗口标题", out var 标题Obj) || string.IsNullOrEmpty(标题Obj?.ToString()))
-                return "错误: 缺少参数 '窗口标题'";
+            if (!尝试获取必填字符串(参数, "窗口标题", out var 窗口标题))
+                return 错误缺少参数("窗口标题");
 
-            string 窗口标题 = 标题Obj.ToString();
             var hWnd = 淼喵妙神奇工具库.感知库.窗口处理器.查找窗口(窗口标题);
 
             if (hWnd == IntPtr.Zero)
-                return "{\"found\": false}";
+                return JsonSerializer.Serialize(new { found = false });
 
             var rect = 淼喵妙神奇工具库.感知库.窗口处理器.获取窗口框(hWnd);
             if (rect == System.Drawing.Rectangle.Empty)
-                return "{\"found\": false}";
+                return JsonSerializer.Serialize(new { found = false });
 
             string 完整标题 = 淼喵妙神奇工具库.感知库.窗口处理器.获取窗口标题(hWnd);
 
-            return $"{{\"found\": true, \"title\": \"{完整标题.Replace("\"", "\\\"")}\", \"rect\": {{\"x\": {rect.X}, \"y\": {rect.Y}, \"width\": {rect.Width}, \"height\": {rect.Height}}}}}";
+            return JsonSerializer.Serialize(new
+            {
+                found = true,
+                title = 完整标题,
+                rect = new { x = rect.X, y = rect.Y, width = rect.Width, height = rect.Height }
+            });
         }
 
         private static void 记录攻略(string 搜索关键词, string 搜索结果)
